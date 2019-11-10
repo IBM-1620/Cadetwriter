@@ -14,12 +14,12 @@
 //                      WheelWriter USB Interface Board, v1.7. May 2019.  Retired.
 //                      WheelWriter Serial Interface Board, v2.0. July 2019.
 //
-//  Build environment:  Arduino IDE 1.8.9 (https://www.arduino.cc/en/main/software).
-//                      Teensyduino 1.47 (https://www.pjrc.com/teensy/td_download.html).
+//  Build environment:  Arduino IDE 1.8.10 (https://www.arduino.cc/en/main/software).
+//                      Teensyduino 1.48 (https://www.pjrc.com/teensy/td_download.html).
 //                      Compile options - Teensy 3.5, USB Serial, 120 MHz, Fastest with LTO.
 //
-//  Memory:             77144 bytes (14%) of program storage space.
-//                      107976 bytes (41%) of dynamic memory for global variables.
+//  Memory:             78748 bytes (15%) of program storage space.
+//                      107988 bytes (41%) of dynamic memory for global variables.
 //
 //  Documentation:      IBM 1620 Jr. Console Typewriter Protocol, version 1.10, 5/24/2019.
 //                      IBM 1620 Jr. Console Typewriter Test Program, version 1.10, 5/24/2019.
@@ -64,6 +64,9 @@
 //                                      Disabled unuseable baud rates.
 //                                      Cleaned up the printing of some special ASCII characters.
 //                                      Added developer function to calibrate print string timings.
+//                      5R5  11/8/2019  Added support for semi-automatic paper loading.
+//                                      Increased time for ISR delay to deal with overlapping column scans.
+//                                      Adjusted timing of unshifted, shifted, and code characters.
 //
 //  Future ideas:       1. Support other Wheelwriter models.
 //
@@ -80,6 +83,10 @@
 //                         terminals such as an ASR-33 and Flexowriter.
 //
 //                      6. Support lower speed baud rates, if possible.
+//
+//                      7. Add pagination support for individual sheets of paper or fan-fold paper.
+//
+//                      8. Add keyboard key which aborts current printout and flushes print buffer.
 //
 //======================================================================================================================
 
@@ -229,7 +236,7 @@
 //                        |               |               |          |             |      |              |       |
 //                        |               |     Word      |          | <req space> |      |              |       |
 //                    ----+---------------+---------------+----------+-------------+------+--------------+-------+ ...
-//                      2 | <right shift> | \          /  |    z     |             |      |      x       |   c   |
+//                      2 | <right shift> | \          /  |    z     |<load paper> |      |      x       |   c   |
 //                        |               |   [X33_022]   |    Z     |             |      |      X       |   C   |
 //                        |               | /          \  |          |             |      | <power wise> |  Ctr  |
 //                    ----+---------------+---------------+----------+-------------+------+--------------+-------+ ...
@@ -716,6 +723,20 @@
 //                        is made in an internal array by warning type.  The warning counts can be printed, and
 //                        optionally cleared, using the setup function of the emulations.
 //
+//  Semi-automatic paper loading - The Wheelwriter is able to semi-automatically load paper.  This operation is
+//                                 triggered by moving the paper bail all the way forward, holding it until the carriage
+//                                 starts moving, then releasing it.  The carriage will move to the center of the line,
+//                                 the paper advances approximately 2.5 - 12 inches (depending on where the top-of-form
+//                                 is set), and then the carriage returns to the left margin.  This takes 3 - 9 seconds
+//                                 and should only be done when nothing is printing.
+//
+//                                 The paper bail microswitch is wired directly across column 4 and row 2 on the logic
+//                                 board's keyboard input.  Because of this, the serial interface board knows nothing
+//                                 about the load paper operation to pause printing or reset the current line position.
+//                                 There is an optional hardware modification to the serial interface board, documented
+//                                 on the Cadetwriter Slack "building" message board, which allows this firmware to
+//                                 detect and process the switch closure.
+//
 //  Setup function - All emulations support a manual setup function.  It is initiated by pressing the Code/Ctrl key and
 //                   "Setup" keys on the keyboard.  The "Setup" key is the upper-rightmost key, labelled "Paper Up
 //                   Micro" on an unmodified Wheelwriter.  The setup function allows operating parameters of the
@@ -790,12 +811,10 @@
 //  Global definitions.
 //
 //**********************************************************************************************************************
-#if F_CPU == 120000090
-char char char
-#endif
+
 // Firmware version values.
-#define VERSION       54
-#define VERSION_TEXT  "5R4"
+#define VERSION       55
+#define VERSION_TEXT  "5R5"
 
 // Physical I/O port pins.
 #define PTC_5   13  // Embedded Teensy 3.5 board orange LED.
@@ -902,7 +921,7 @@ char char char
 #define WW_COLUMN_2     0x02  // <right arrow>, <right word>, Paper Down, <down micro>, Paper Up, <up micro>, Reloc,
                               // Line Space, <down arrow>, <down line>
 #define WW_COLUMN_3     0x03  // z, Z, q, Q, Impr, 1, !, Spell, +/-, <degree>, a, A
-#define WW_COLUMN_4     0x04  // <space>, <required space>, L Mar, T Clr
+#define WW_COLUMN_4     0x04  // <space>, <required space>, <load paper>, L Mar, T Clr
 #define WW_COLUMN_5     0x05  // Code
 #define WW_COLUMN_6     0x06  // x, X, <power wise>, w, W, 2, @, Add, s, S
 #define WW_COLUMN_7     0x07  // c, C, Ctr, e, E, 3, #, Del, d, D, Dec T
@@ -919,8 +938,8 @@ char char char
 #define WW_ROW_NULL  0X00  // Null row.
 #define WW_ROW_1     0x01  // <left shift>, <right arrow>, <right word>, <space>, <required space>, Code, b, B, Bold, n,
                            // N, Caps, /, ?, <left arrow>, <left word>, <back X>, <back word>
-#define WW_ROW_2     0x02  // <right shift>, z, Z, x, X, <power wise>, c, C, Ctr, v, V, m, M, ,, ., <up arrow>,
-                           // <up line>, Lock
+#define WW_ROW_2     0x02  // <right shift>, z, Z, <load paper>, x, X, <power wise>, c, C, Ctr, v, V, m, M, ,, .,
+                           // <up arrow>, <up line>, Lock
 #define WW_ROW_3     0x03  // t, T, y, Y, <1/2 up>, ], [, <superscript 3>, <half>, <quarter>, <superscript 2>, R Mar
 #define WW_ROW_4     0x04  // Paper Down, <down micro>, q, Q, Impr, L Mar, w, W, e, E, r, R, A Rtn, u, U, Cont, i, I,
                            // Word, o, O, R Flsh, p, P, Tab, IndL
@@ -948,88 +967,90 @@ char char char
 #define WW_KEY_PLUSMINUS_DEGREE            13  // +/-, <degree> key code.
 #define WW_KEY_a_A                         14  // a, A key code.
 #define WW_KEY_SPACE_REQSPACE              15  // <space>, <required space> key code.
-#define WW_KEY_X13_43                      16  // *** not available on Wheelwriter 1000.
-#define WW_KEY_LMar                        17  // L Mar key code.
-#define WW_KEY_X12_45                      18  // *** not available on Wheelwriter 1000.
-#define WW_KEY_X11_46                      19  // *** not available on Wheelwriter 1000.
-#define WW_KEY_X14_47                      20  // *** not available on Wheelwriter 1000.
-#define WW_KEY_TClr                        21  // T Clr key code.
-#define WW_KEY_Code                        22  // <code> key code.
-#define WW_KEY_x_X_POWERWISE               23  // x, X, <power wise> key code.
-#define WW_KEY_w_W                         24  // w, W key code.
-#define WW_KEY_2_AT_Add                    25  // 2, @, Add key code.
-#define WW_KEY_s_S                         26  // s, S key code.
-#define WW_KEY_c_C_Ctr                     27  // c, C, Ctr key code.
-#define WW_KEY_e_E                         28  // e, E key code.
-#define WW_KEY_3_POUND_Del                 29  // 3, #, Del key code.
-#define WW_KEY_d_D_DecT                    30  // d, D, Dec T key code.
-#define WW_KEY_b_B_Bold                    31  // b, B, Bold key code.
-#define WW_KEY_v_V                         32  // v, V key code.
-#define WW_KEY_t_T                         33  // t, T key code.
-#define WW_KEY_r_R_ARtn                    34  // r, R, A Rtn key code.
-#define WW_KEY_4_DOLLAR_Vol                35  // 4, $, Vol key code.
-#define WW_KEY_5_PERCENT                   36  // 5, % key code.
-#define WW_KEY_f_F                         37  // f, F key code.
-#define WW_KEY_g_G                         38  // g, G key code.
-#define WW_KEY_n_N_Caps                    39  // n, N, Caps key code.
-#define WW_KEY_m_M                         40  // m, M key code.
-#define WW_KEY_y_Y_12UP                    41  // y, Y, <1/2 up> key code.
-#define WW_KEY_u_U_Cont                    42  // u, U, Cont key code.
-#define WW_KEY_7_AMPERSAND                 43  // 7, & key code.
-#define WW_KEY_6_CENT                      44  // 6, <cent> key code.
-#define WW_KEY_j_J                         45  // j, J key code.
-#define WW_KEY_h_H_12DOWN                  46  // h, H, <1/2 down> key code.
-#define WW_KEY_COMMA_COMMA                 47  // ,, , key code.
-#define WW_KEY_RBRACKET_LBRACKET_SUPER3    48  // ], [, <superscript 3> key code.
-#define WW_KEY_i_I_Word                    49  // i, I, Word key code.
-#define WW_KEY_8_ASTERISK                  50  // 8, * key code.
-#define WW_KEY_EQUAL_PLUS                  51  // =, + key code.
-#define WW_KEY_k_K                         52  // k, K key code.
-#define WW_KEY_PERIOD_PERIOD               53  // ., . key code.
-#define WW_KEY_o_O_RFlsh                   54  // o, O, R Flsh key code.
-#define WW_KEY_9_LPAREN_Stop               55  // 9, (, Stop key code.
-#define WW_KEY_l_L_Lang                    56  // l, L, Lang key code.
-#define WW_KEY_SLASH_QUESTION              57  // /, ? key code.
-#define WW_KEY_HALF_QUARTER_SUPER2         58  // <half>, <quarter>, <superscript 2> key code.
-#define WW_KEY_p_P                         59  // p, P key code.
-#define WW_KEY_0_RPAREN                    60  // 0, ) key code.
-#define WW_KEY_HYPHEN_UNDERSCORE           61  // -, _ key code.
-#define WW_KEY_SEMICOLON_COLON_SECTION     62  // ;, :, <section> key code.
-#define WW_KEY_APOSTROPHE_QUOTE_PARAGRAPH  63  // ', ", <paragraph> key code.
-#define WW_KEY_LARROW_Word                 64  // <left arrow>, <left word> key code.
-#define WW_KEY_UARROW_Line                 65  // <up arrow>, <up line> key code.
-#define WW_KEY_X22_134                     66  // *** not available on Wheelwriter 1000.
-#define WW_KEY_X21_135                     67  // *** not available on Wheelwriter 1000.
-#define WW_KEY_Backspace_Bksp1             68  // Backspace, Bksp 1 key code.
-#define WW_KEY_X23_137                     69  // *** not available on Wheelwriter 1000.
-#define WW_KEY_CRtn_IndClr                 70  // C Rtn, IndClr key code.
-#define WW_KEY_BACKX_Word                  71  // <back X>, <back word> key code.
-#define WW_KEY_Lock                        72  // Lock key code.
-#define WW_KEY_RMar                        73  // R Mar key code.
-#define WW_KEY_Tab_IndL                    74  // Tab key code.
-#define WW_KEY_MarRel_RePrt                75  // Mar Rel, RePrt key code.
-#define WW_KEY_TSet                        76  // T Set key code.
-#define WW_KEY_X15_148                     77  // *** not available on Wheelwriter 1000.
+#define WW_KEY_LOADPAPER                   16  // <load paper> key code.
+#define WW_KEY_X13_43                      17  // *** not available on Wheelwriter 1000.
+#define WW_KEY_LMar                        18  // L Mar key code.
+#define WW_KEY_X12_45                      19  // *** not available on Wheelwriter 1000.
+#define WW_KEY_X11_46                      20  // *** not available on Wheelwriter 1000.
+#define WW_KEY_X14_47                      21  // *** not available on Wheelwriter 1000.
+#define WW_KEY_TClr                        22  // T Clr key code.
+#define WW_KEY_Code                        23  // <code> key code.
+#define WW_KEY_x_X_POWERWISE               24  // x, X, <power wise> key code.
+#define WW_KEY_w_W                         25  // w, W key code.
+#define WW_KEY_2_AT_Add                    26  // 2, @, Add key code.
+#define WW_KEY_s_S                         27  // s, S key code.
+#define WW_KEY_c_C_Ctr                     28  // c, C, Ctr key code.
+#define WW_KEY_e_E                         29  // e, E key code.
+#define WW_KEY_3_POUND_Del                 30  // 3, #, Del key code.
+#define WW_KEY_d_D_DecT                    31  // d, D, Dec T key code.
+#define WW_KEY_b_B_Bold                    32  // b, B, Bold key code.
+#define WW_KEY_v_V                         33  // v, V key code.
+#define WW_KEY_t_T                         34  // t, T key code.
+#define WW_KEY_r_R_ARtn                    35  // r, R, A Rtn key code.
+#define WW_KEY_4_DOLLAR_Vol                36  // 4, $, Vol key code.
+#define WW_KEY_5_PERCENT                   37  // 5, % key code.
+#define WW_KEY_f_F                         38  // f, F key code.
+#define WW_KEY_g_G                         39  // g, G key code.
+#define WW_KEY_n_N_Caps                    40  // n, N, Caps key code.
+#define WW_KEY_m_M                         41  // m, M key code.
+#define WW_KEY_y_Y_12UP                    42  // y, Y, <1/2 up> key code.
+#define WW_KEY_u_U_Cont                    43  // u, U, Cont key code.
+#define WW_KEY_7_AMPERSAND                 44  // 7, & key code.
+#define WW_KEY_6_CENT                      45  // 6, <cent> key code.
+#define WW_KEY_j_J                         46  // j, J key code.
+#define WW_KEY_h_H_12DOWN                  47  // h, H, <1/2 down> key code.
+#define WW_KEY_COMMA_COMMA                 48  // ,, , key code.
+#define WW_KEY_RBRACKET_LBRACKET_SUPER3    49  // ], [, <superscript 3> key code.
+#define WW_KEY_i_I_Word                    50  // i, I, Word key code.
+#define WW_KEY_8_ASTERISK                  51  // 8, * key code.
+#define WW_KEY_EQUAL_PLUS                  52  // =, + key code.
+#define WW_KEY_k_K                         53  // k, K key code.
+#define WW_KEY_PERIOD_PERIOD               54  // ., . key code.
+#define WW_KEY_o_O_RFlsh                   55  // o, O, R Flsh key code.
+#define WW_KEY_9_LPAREN_Stop               56  // 9, (, Stop key code.
+#define WW_KEY_l_L_Lang                    57  // l, L, Lang key code.
+#define WW_KEY_SLASH_QUESTION              58  // /, ? key code.
+#define WW_KEY_HALF_QUARTER_SUPER2         59  // <half>, <quarter>, <superscript 2> key code.
+#define WW_KEY_p_P                         60  // p, P key code.
+#define WW_KEY_0_RPAREN                    61  // 0, ) key code.
+#define WW_KEY_HYPHEN_UNDERSCORE           62  // -, _ key code.
+#define WW_KEY_SEMICOLON_COLON_SECTION     63  // ;, :, <section> key code.
+#define WW_KEY_APOSTROPHE_QUOTE_PARAGRAPH  64  // ', ", <paragraph> key code.
+#define WW_KEY_LARROW_Word                 65  // <left arrow>, <left word> key code.
+#define WW_KEY_UARROW_Line                 66  // <up arrow>, <up line> key code.
+#define WW_KEY_X22_134                     67  // *** not available on Wheelwriter 1000.
+#define WW_KEY_X21_135                     68  // *** not available on Wheelwriter 1000.
+#define WW_KEY_Backspace_Bksp1             69  // Backspace, Bksp 1 key code.
+#define WW_KEY_X23_137                     70  // *** not available on Wheelwriter 1000.
+#define WW_KEY_CRtn_IndClr                 71  // C Rtn, IndClr key code.
+#define WW_KEY_BACKX_Word                  72  // <back X>, <back word> key code.
+#define WW_KEY_Lock                        73  // Lock key code.
+#define WW_KEY_RMar                        74  // R Mar key code.
+#define WW_KEY_Tab_IndL                    75  // Tab key code.
+#define WW_KEY_MarRel_RePrt                76  // Mar Rel, RePrt key code.
+#define WW_KEY_TSet                        77  // T Set key code.
+#define WW_KEY_X15_148                     78  // *** not available on Wheelwriter 1000.
 
-#define NUM_WW_KEYS                        78  // Number of keyboard keys.
+#define NUM_WW_KEYS                        79  // Number of keyboard keys.
 
 // Wheelwriter special print codes.
-#define WW_NULL     0x00                 // Null print code.
-#define WW_NULL_1   (WW_COLUMN_1 << 4)   // Column 1 null print code.
-#define WW_NULL_2   (WW_COLUMN_2 << 4)   // Column 2 null print code.
-#define WW_NULL_3   (WW_COLUMN_3 << 4)   // Column 3 null print code.
-#define WW_NULL_4   (WW_COLUMN_4 << 4)   // Column 4 null print code.
-#define WW_NULL_5   (WW_COLUMN_5 << 4)   // Column 5 null print code.
-#define WW_NULL_6   (WW_COLUMN_6 << 4)   // Column 6 null print code.
-#define WW_NULL_7   (WW_COLUMN_7 << 4)   // Column 7 null print code.
-#define WW_NULL_8   (WW_COLUMN_8 << 4)   // Column 8 null print code.
-#define WW_NULL_9   (WW_COLUMN_9 << 4)   // Column 9 null print code.
-#define WW_NULL_10  (WW_COLUMN_10 << 4)  // Column 10 null print code.
-#define WW_NULL_11  (WW_COLUMN_11 << 4)  // Column 11 null print code.
-#define WW_NULL_12  (WW_COLUMN_12 << 4)  // Column 12 null print code.
-#define WW_NULL_13  (WW_COLUMN_13 << 4)  // Column 13 null print code.
-#define WW_NULL_14  (WW_COLUMN_14 << 4)  // Column 14 null print code.
-#define WW_SKIP     0xff                 // Skip print code.
+#define WW_NULL      0x00                 // Null print code.
+#define WW_NULL_1    (WW_COLUMN_1 << 4)   // Column 1 null print code.
+#define WW_NULL_2    (WW_COLUMN_2 << 4)   // Column 2 null print code.
+#define WW_NULL_3    (WW_COLUMN_3 << 4)   // Column 3 null print code.
+#define WW_NULL_4    (WW_COLUMN_4 << 4)   // Column 4 null print code.
+#define WW_NULL_5    (WW_COLUMN_5 << 4)   // Column 5 null print code.
+#define WW_NULL_6    (WW_COLUMN_6 << 4)   // Column 6 null print code.
+#define WW_NULL_7    (WW_COLUMN_7 << 4)   // Column 7 null print code.
+#define WW_NULL_8    (WW_COLUMN_8 << 4)   // Column 8 null print code.
+#define WW_NULL_9    (WW_COLUMN_9 << 4)   // Column 9 null print code.
+#define WW_NULL_10   (WW_COLUMN_10 << 4)  // Column 10 null print code.
+#define WW_NULL_11   (WW_COLUMN_11 << 4)  // Column 11 null print code.
+#define WW_NULL_12   (WW_COLUMN_12 << 4)  // Column 12 null print code.
+#define WW_NULL_13   (WW_COLUMN_13 << 4)  // Column 13 null print code.
+#define WW_NULL_14   (WW_COLUMN_14 << 4)  // Column 14 null print code.
+#define WW_CATCH_UP  0xfe                 // Wait for printing to catch up.
+#define WW_SKIP      0xff                 // Skip print code.
 
 // Wheelwriter print codes.
 #define WW_LShift                      (WW_NULL_1 | WW_ROW_1)   // <left shift> print code.
@@ -1045,6 +1066,7 @@ char char char
 #define WW_PLUSMINUS_DEGREE            (WW_NULL_3 | WW_ROW_6)   // +/-, <degree> print code.
 #define WW_a_A                         (WW_NULL_3 | WW_ROW_7)   // a, A print code.
 #define WW_SPACE_REQSPACE              (WW_NULL_4 | WW_ROW_1)   // <space>, <required space> print code.
+#define WW_LOADPAPER                   (WW_NULL_4 | WW_ROW_2)   // <load paper> print code.
 #define WW_LMar                        (WW_NULL_4 | WW_ROW_4)   // L Mar print code.
 #define WW_TClr                        (WW_NULL_4 | WW_ROW_8)   // T Clr print code.
 #define WW_Code                        (WW_NULL_5 | WW_ROW_1)   // Code print code.
@@ -1107,7 +1129,8 @@ char char char
 
 // Keyboard scan timing values (in msec).
 #define NULL_SCAN_DURATION   12UL  // Time for null full scan.
-#define LONG_SCAN_DURATION  100UL  // Threshold time for Wheelwriter catchup scan.
+#define SHORT_SCAN_DURATION  10UL  // Threshold time for Wheelwriter short scans.
+#define LONG_SCAN_DURATION   25UL  // Threshold time for Wheelwriter long scans.
 
 // Keyboard scan timing values (in usec).
 #define CSCAN_NO_CHANGE   820                                       // Time for column scan with no key change.
@@ -1187,35 +1210,38 @@ char char char
 #define SPACING_CLRALL    11  // No horizontal movement, clear all tabs.
 
 // Print string timing values (in usec).
-#define TIME_CHARACTER   65000  // Time of one average print character.
-#define TIME_HMOVEMENT  125000  // Time of one horizontal movement character.
-#define TIME_VMOVEMENT  125000  // Time of one vertical movement character.
-#define TIME_RETURN     750000  // Time of one full carriage return.
-#define TIME_ADJUST      10000  // Time adjustment for special cases.
+#define TIME_CHARACTER    65000  // Time of one average print character.
+#define TIME_HMOVEMENT   125000  // Time of one horizontal movement character.
+#define TIME_VMOVEMENT   125000  // Time of one vertical movement character.
+#define TIME_RETURN      750000  // Time of one full carriage return.
+#define TIME_LOADPAPER  3000000  // Time of one load paper.
+#define TIME_ADJUST       10000  // Time adjustment for special cases.
 
 #define POSITIVE(v)  ((v) >= 0 ? (v) : 0)
 
-#define TIMING_NONE     0                               // Residual time for non-printing character.
-#define TIMING_UNKNOWN  0                               // Unknown timing, treat as none.
-#define TIMING_NOSHIFT  (POSITIVE(TIME_CHARACTER - (2 * FSCAN_1_CHANGE) - (2 * TIME_ADJUST)))
-                                                        // Residual time for unshifted print character.
-#define TIMING_SHIFT    (POSITIVE(TIME_CHARACTER - (2 * FSCAN_1_CHANGE + FSCAN_2_CHANGES) - TIME_ADJUST))
-                                                        // Residual time for shifted print character.
-#define TIMING_CODE     (POSITIVE(TIME_CHARACTER - (2 * FSCAN_1_CHANGE + FSCAN_2_CHANGES) - TIME_ADJUST))
-                                                        // Residual time for coded print character.
-#define TIMING_HMOVE    (POSITIVE(TIME_HMOVEMENT - (2 * FSCAN_1_CHANGE)))
-                                                        // Residual time for single horizontal movement.
-#define TIMING_HMOVE2   (POSITIVE(TIME_HMOVEMENT - (2 * FSCAN_1_CHANGE + FSCAN_2_CHANGES)))
-                                                        // Residual time for single coded horizontal movement.
-#define TIMING_VMOVE    (POSITIVE(TIME_VMOVEMENT - (2 * FSCAN_1_CHANGE)))
-                                                        // Residual time for single vertical movement.
-#define TIMING_VMOVE2   (POSITIVE(TIME_VMOVEMENT - (2 * FSCAN_1_CHANGE + FSCAN_2_CHANGES)))
-                                                        // Residual time for single coded vertical movement.
-#define TIMING_TAB      (POSITIVE(2 * TIME_HMOVEMENT))  // Residual time for tab print character, 8 spaces.
-#define TIMING_RETURN   (- TIME_RETURN)                 // Residual time for return print character, full line.
+#define TIMING_NONE       0                               // Residual time for non-printing character.
+#define TIMING_UNKNOWN    0                               // Unknown timing, treat as none.
+#define TIMING_NOSHIFT    (POSITIVE(TIME_CHARACTER - (2 * FSCAN_1_CHANGE)))
+                                                          // Residual time for unshifted print character.
+#define TIMING_SHIFT      (POSITIVE(TIME_CHARACTER - (2 * FSCAN_1_CHANGE + FSCAN_2_CHANGES)))
+                                                          // Residual time for shifted print character.
+#define TIMING_CODE       (POSITIVE(TIME_CHARACTER - (2 * FSCAN_1_CHANGE + FSCAN_2_CHANGES)))
+                                                          // Residual time for coded print character.
+#define TIMING_HMOVE      (POSITIVE(TIME_HMOVEMENT - (2 * FSCAN_1_CHANGE)))
+                                                          // Residual time for single horizontal movement.
+#define TIMING_HMOVE2     (POSITIVE(TIME_HMOVEMENT - (2 * FSCAN_1_CHANGE + FSCAN_2_CHANGES)))
+                                                          // Residual time for single coded horizontal movement.
+#define TIMING_VMOVE      (POSITIVE(TIME_VMOVEMENT - (2 * FSCAN_1_CHANGE)))
+                                                          // Residual time for single vertical movement.
+#define TIMING_VMOVE2     (POSITIVE(TIME_VMOVEMENT - (2 * FSCAN_1_CHANGE + FSCAN_2_CHANGES)))
+                                                          // Residual time for single coded vertical movement.
+#define TIMING_TAB        (POSITIVE(2 * TIME_HMOVEMENT))  // Residual time for tab print character, 8 spaces.
+#define TIMING_RETURN     (- TIME_RETURN)                 // Residual time for return print character, full line.
+#define TIMING_LOADPAPER  (POSITIVE(TIME_LOADPAPER - (2 * FSCAN_1_CHANGE)))
+                                                          // Residual time for a load paper.
 
 // ISR values.
-#define ISR_DELAY  2  // ISR delay (in usec) before reading column lines.
+#define ISR_DELAY  20  // ISR delay (in usec) before reading column lines.
 
 // Setup values.
 #define COLUMN_COMMAND   68  // Column to space to for command response so prompt can be read.
@@ -1288,10 +1314,11 @@ char char char
 
 // Warning codes.
 #define WARNING_NULL             0  // Null warning.
-#define WARNING_LONG_SCAN        1  // Long column scan warning.
-#define WARNING_UNEXPECTED_SCAN  2  // Unexected column scan warning.
+#define WARNING_SHORT_SCAN       1  // Short column scan warning.
+#define WARNING_LONG_SCAN        2  // Long column scan warning.
+#define WARNING_UNEXPECTED_SCAN  3  // Unexected column scan warning.
 
-#define NUM_WARNINGS             3  // Number of warning codes.
+#define NUM_WARNINGS             4  // Number of warning codes.
 
 // Emulation codes.
                                  // J6 J7  Jumper settings.
@@ -1444,11 +1471,14 @@ struct print_info {
 //
 //**********************************************************************************************************************
 
+// <load paper> print string.
+const byte WW_STR_LOADPAPER[]              = {WW_CATCH_UP, WW_LOADPAPER, WW_NULL_4, WW_NULL_14, WW_NULL};
+const struct print_info WW_PRINT_LOADPAPER = {SPACING_RETURN, TIMING_LOADPAPER, &WW_STR_LOADPAPER};
+
 // <space>, <required space>, Tab, C Rtn print strings.
 const byte WW_STR_SPACE[]                 = {WW_SPACE_REQSPACE, WW_NULL_4, WW_NULL_14, WW_NULL};
 const struct print_info WW_PRINT_SPACE    = {SPACING_FORWARD, TIMING_NOSHIFT, &WW_STR_SPACE};
-const struct print_info WW_PRINT_SPACEX   = {SPACING_NONE, TIMING_NOSHIFT, &WW_STR_SPACE};
-                                                                                     // Special space for column offset.
+const struct print_info WW_PRINT_SPACEX   = {SPACING_NONE, TIMING_NOSHIFT, &WW_STR_SPACE};  // Special space for column offset.
 
 const byte WW_STR_REQSPACE[]              = {WW_Code, WW_SPACE_REQSPACE, WW_Code, WW_NULL_4, WW_NULL_14, WW_NULL};
 const struct print_info WW_PRINT_REQSPACE = {SPACING_FORWARD, TIMING_NOSHIFT, &WW_STR_REQSPACE};
@@ -1657,6 +1687,10 @@ const struct print_info WW_PRINT_8 = {SPACING_FORWARD, TIMING_NOSHIFT, &WW_STR_8
 
 const byte WW_STR_9[]              = {WW_9_LPAREN_Stop, WW_NULL_11, WW_NULL_14, WW_NULL};
 const struct print_info WW_PRINT_9 = {SPACING_FORWARD, TIMING_NOSHIFT, &WW_STR_9};
+
+// QV079 - stress case alphanumeric print string.
+const byte WW_STR_QV079[]              = {WW_LShift, WW_q_Q_Impr, WW_LShift, WW_NULL_1, WW_NULL_14, WW_NULL};
+const struct print_info WW_PRINT_QV079 = {SPACING_FORWARD, TIMING_SHIFT, &WW_STR_QV079};
 
 // !, @, #, $, %, <cent>, &, *, (, ) print strings.
 const byte WW_STR_EXCLAMATION[]              = {WW_LShift, WW_1_EXCLAMATION_Spell, WW_LShift, WW_NULL_1, WW_NULL_14,
@@ -1979,6 +2013,7 @@ const char* error_text[NUM_ERRORS] = {NULL,
 
 // Warning text table.
 const char* warning_text[NUM_WARNINGS] = {NULL,
+                                          "Short column scan warnings.",
                                           "Long column scan warnings.",
                                           "Unexpected column scan warnings."};
 
@@ -2038,7 +2073,7 @@ const boolean pc_validation[256] = {
         TRUE,  TRUE,  TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
         TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
         TRUE,  FALSE, TRUE,  FALSE, TRUE,  TRUE,  TRUE,  TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
-        TRUE,  TRUE,  FALSE, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
+        TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
         TRUE,  TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
         TRUE,  FALSE, TRUE,  FALSE, TRUE,  TRUE,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
         TRUE,  FALSE, TRUE,  FALSE, TRUE,  TRUE,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
@@ -2049,7 +2084,7 @@ const boolean pc_validation[256] = {
         TRUE,  TRUE,  FALSE, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
         TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
         TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
-        FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE};
+        FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE,  TRUE};
 
 // Escape termination table.
 const boolean terminate_escape[128] = {
@@ -2173,6 +2208,7 @@ volatile byte tabs[166] = {SETTING_UNDEFINED};      // Tab settings.            
 #define IBM_KEY_RELEASESTART     WW_KEY_PLUSMINUS_DEGREE            // <release start> key code.
 #define IBM_KEY_A                WW_KEY_a_A                         // A key code.
 #define IBM_KEY_SPACE            WW_KEY_SPACE_REQSPACE              // <space> key code.
+#define IBM_KEY_LOADPAPER        WW_KEY_LOADPAPER                   // <load paper> key code.
 #define IBM_KEY_LMAR             WW_KEY_LMar                        // <left margin> key code.
 #define IBM_KEY_TCLR             WW_KEY_TClr                        // <tab clear> key code.
 #define IBM_KEY_X                WW_KEY_x_X_POWERWISE               // X key code.
@@ -2588,6 +2624,7 @@ const struct key_action IBM_ACTIONS_MODE0[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},      // <load paper>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -2668,6 +2705,7 @@ const struct key_action IBM_ACTIONS_MODE0[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},      // <load paper>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -2748,6 +2786,7 @@ const struct key_action IBM_ACTIONS_MODE0[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_NONE,                                     0,     NULL},                     //
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_SEND | ACTION_PRINT,                      '[',   &WW_PRINT_LMar},           // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -2831,6 +2870,7 @@ const struct key_action IBM_ACTIONS_MODE1[3 * NUM_WW_KEYS] = {
   {ACTION_SEND | ACTION_PRINT,                      '#',   &IBM_PRINT_RELEASESTART},  // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},      // <load paper>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -2911,6 +2951,7 @@ const struct key_action IBM_ACTIONS_MODE1[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},      // <load paper>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -2991,6 +3032,7 @@ const struct key_action IBM_ACTIONS_MODE1[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_NONE,                                     0,     NULL},                     //
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_SEND | ACTION_PRINT,                      '[',   &WW_PRINT_LMar},           // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3074,6 +3116,7 @@ const struct key_action IBM_ACTIONS_MODE1_FLAG[3 * NUM_WW_KEYS] = {
   {ACTION_SEND | ACTION_PRINT | ACTION_IBM_MODE_1,  '#',   &IBM_PRINT_RELEASESTART},  // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},      // <load paper>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3154,6 +3197,7 @@ const struct key_action IBM_ACTIONS_MODE1_FLAG[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},      // <load paper>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3234,6 +3278,7 @@ const struct key_action IBM_ACTIONS_MODE1_FLAG[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_NONE,                                     0,     NULL},                     //
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3317,6 +3362,7 @@ const struct key_action IBM_ACTIONS_MODE2[3 * NUM_WW_KEYS] = {
   {ACTION_SEND | ACTION_PRINT,                      '#',   &IBM_PRINT_RELEASESTART},  // <release start>
   {ACTION_SEND | ACTION_PRINT,                      'A',   &WW_PRINT_A},              // A
   {ACTION_SEND | ACTION_PRINT,                      ' ',   &WW_PRINT_SPACE},          // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},      // <load paper>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3397,6 +3443,7 @@ const struct key_action IBM_ACTIONS_MODE2[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},      // <load paper>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3477,6 +3524,7 @@ const struct key_action IBM_ACTIONS_MODE2[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_NONE,                                     0,     NULL},                     //
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_SEND | ACTION_PRINT,                      '[',   &WW_PRINT_LMar},           // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3560,6 +3608,7 @@ const struct key_action IBM_ACTIONS_MODE3[3 * NUM_WW_KEYS] = {
   {ACTION_SEND | ACTION_PRINT,                      '#',   &IBM_PRINT_RELEASESTART},  // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},      // <load paper>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3640,6 +3689,7 @@ const struct key_action IBM_ACTIONS_MODE3[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},      // <load paper>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3720,6 +3770,7 @@ const struct key_action IBM_ACTIONS_MODE3[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_NONE,                                     0,     NULL},                     //
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3803,6 +3854,7 @@ const struct key_action IBM_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_COMMAND,                                  'A',   NULL},                     // A
   {ACTION_COMMAND,                                  ' ',   NULL},                     // <space>
+  {ACTION_NONE,                                     0,     NULL},                     //
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3883,6 +3935,7 @@ const struct key_action IBM_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_NONE,                                     0,     NULL},                     //
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3963,6 +4016,7 @@ const struct key_action IBM_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <release start>
   {ACTION_NONE,                                     0,     NULL},                     // A
   {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_NONE,                                     0,     NULL},                     //
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -4177,6 +4231,7 @@ void Print_IBM_character_set ()  {
 #define ASCII_KEY_BAPOSTROPHE_TILDE_RS      WW_KEY_PLUSMINUS_DEGREE            // `, ~ key code.
 #define ASCII_KEY_a_A_SOH                   WW_KEY_a_A                         // a, A, SOH key code.
 #define ASCII_KEY_SPACE                     WW_KEY_SPACE_REQSPACE              // <space> key code.
+#define ASCII_KEY_LOADPAPER                 WW_KEY_LOADPAPER                   // <load paper> key code.
 #define ASCII_KEY_LMAR                      WW_KEY_LMar                        // <left margin> key code.
 #define ASCII_KEY_TCLR                      WW_KEY_TClr                        // <tab clear> key code.
 #define ASCII_KEY_CONTROL                   WW_KEY_Code                        // <control> key code.
@@ -4591,6 +4646,7 @@ const struct key_action ASCII_ACTIONS_HALF[3 * NUM_WW_KEYS] = {
   {ACTION_SEND | ACTION_PRINT,                      '`',   &ASCII_PRINT_BAPOSTROPHE},  // `, ~
   {ACTION_SEND | ACTION_PRINT,                      'a',   &WW_PRINT_a},               // a, A, SOH
   {ACTION_SEND | ACTION_PRINT,                      ' ',   &WW_PRINT_SPACE},           // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},       // <load paper>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -4671,6 +4727,7 @@ const struct key_action ASCII_ACTIONS_HALF[3 * NUM_WW_KEYS] = {
   {ACTION_SEND | ACTION_PRINT,                      '~',   &ASCII_PRINT_TILDE},        // `, ~
   {ACTION_SEND | ACTION_PRINT,                      'A',   &WW_PRINT_A},               // a, A, SOH
   {ACTION_SEND | ACTION_PRINT,                      ' ',   &WW_PRINT_SPACE},           // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},       // <load paper>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -4751,6 +4808,7 @@ const struct key_action ASCII_ACTIONS_HALF[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // `, ~
   {ACTION_SEND,                                     0x01,  NULL},                      // a, A, SOH
   {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_PRINT,                                    0,     &WW_PRINT_LMar},            // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -4834,6 +4892,7 @@ const struct key_action ASCII_ACTIONS_HALF_UPPERCASE[3 * NUM_WW_KEYS] = {
   {ACTION_SEND | ACTION_PRINT,                      '`',   &ASCII_PRINT_BAPOSTROPHE},  // `, ~
   {ACTION_SEND | ACTION_PRINT,                      'A',   &WW_PRINT_A},               // a, A, SOH
   {ACTION_SEND | ACTION_PRINT,                      ' ',   &WW_PRINT_SPACE},           // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},       // <load paper>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -4914,6 +4973,7 @@ const struct key_action ASCII_ACTIONS_HALF_UPPERCASE[3 * NUM_WW_KEYS] = {
   {ACTION_SEND | ACTION_PRINT,                      '~',   &ASCII_PRINT_TILDE},        // `, ~
   {ACTION_SEND | ACTION_PRINT,                      'A',   &WW_PRINT_A},               // a, A, SOH
   {ACTION_SEND | ACTION_PRINT,                      ' ',   &WW_PRINT_SPACE},           // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},       // <load paper>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -4994,6 +5054,7 @@ const struct key_action ASCII_ACTIONS_HALF_UPPERCASE[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // `, ~
   {ACTION_SEND,                                     0x01,  NULL},                      // a, A, SOH
   {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_PRINT,                                    0,     &WW_PRINT_LMar},            // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -5077,6 +5138,7 @@ const struct key_action ASCII_ACTIONS_FULL[3 * NUM_WW_KEYS] = {
   {ACTION_SEND,                                     '`',   NULL},                      // `, ~
   {ACTION_SEND,                                     'a',   NULL},                      // a, A, SOH
   {ACTION_SEND,                                     ' ',   NULL},                      // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},       // <load paper>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -5157,6 +5219,7 @@ const struct key_action ASCII_ACTIONS_FULL[3 * NUM_WW_KEYS] = {
   {ACTION_SEND,                                     '~',   NULL},                      // `, ~
   {ACTION_SEND,                                     'A',   NULL},                      // a, A, SOH
   {ACTION_SEND,                                     ' ',   NULL},                      // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},       // <load paper>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -5237,6 +5300,7 @@ const struct key_action ASCII_ACTIONS_FULL[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // `, ~
   {ACTION_SEND,                                     0x01,  NULL},                      // a, A, SOH
   {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_PRINT,                                    0,     &WW_PRINT_LMar},            // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -5320,6 +5384,7 @@ const struct key_action ASCII_ACTIONS_FULL_UPPERCASE[3 * NUM_WW_KEYS] = {
   {ACTION_SEND,                                     '`',   NULL},                      // `, ~
   {ACTION_SEND,                                     'A',   NULL},                      // a, A, SOH
   {ACTION_SEND,                                     ' ',   NULL},                      // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},       // <load paper>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -5400,6 +5465,7 @@ const struct key_action ASCII_ACTIONS_FULL_UPPERCASE[3 * NUM_WW_KEYS] = {
   {ACTION_SEND,                                     '~',   NULL},                      // `, ~
   {ACTION_SEND,                                     'A',   NULL},                      // a, A, SOH
   {ACTION_SEND,                                     ' ',   NULL},                      // <space>
+  {ACTION_PRINT,                                    0,     &WW_PRINT_LOADPAPER},       // <load paper>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -5480,6 +5546,7 @@ const struct key_action ASCII_ACTIONS_FULL_UPPERCASE[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // `, ~
   {ACTION_SEND,                                     0x01,  NULL},                      // a, A, SOH
   {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_PRINT,                                    0,     &WW_PRINT_LMar},            // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -5563,6 +5630,7 @@ const struct key_action ASCII_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // `, ~
   {ACTION_COMMAND,                                  'a',   NULL},                      // a, A, SOH
   {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -5643,6 +5711,7 @@ const struct key_action ASCII_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // `, ~
   {ACTION_COMMAND,                                  'A',   NULL},                      // a, A, SOH
   {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -5723,6 +5792,7 @@ const struct key_action ASCII_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // `, ~
   {ACTION_NONE,                                     0,     NULL},                      // a, A, SOH
   {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -6021,6 +6091,7 @@ const struct key_action FUTURE_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // `, ~
   {ACTION_COMMAND,                                  'A',   NULL},                      // a, A, SOH
   {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -6101,6 +6172,7 @@ const struct key_action FUTURE_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // `, ~
   {ACTION_COMMAND,                                  'A',   NULL},                      // a, A, SOH
   {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -6181,6 +6253,7 @@ const struct key_action FUTURE_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // `, ~
   {ACTION_NONE,                                     0,     NULL},                      // a, A, SOH
   {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -6308,14 +6381,38 @@ void ISR_STANDALONE () {
   // order to be recognized by the WheelWriter logic board.  The tests below occur AFTER the column signal has been
   // asserted, so we are in the Tcol_pulse = 820 uSec (for no printing) or Tcol_pulse_long1 = 3.68 mSec (if printing
   // characters) time period.
-  if (digitalReadFast (ROW_IN_1_PIN) == LOW) digitalWriteFast (ROW_OUT_1_PIN, HIGH);
-  if (digitalReadFast (ROW_IN_2_PIN) == LOW) digitalWriteFast (ROW_OUT_2_PIN, HIGH);
-  if (digitalReadFast (ROW_IN_3_PIN) == LOW) digitalWriteFast (row_out_3_pin, HIGH);
-  if (digitalReadFast (ROW_IN_4_PIN) == LOW) digitalWriteFast (row_out_4_pin, HIGH);
-  if (digitalReadFast (ROW_IN_5_PIN) == LOW) digitalWriteFast (ROW_OUT_5_PIN, HIGH);
-  if (digitalReadFast (ROW_IN_6_PIN) == LOW) digitalWriteFast (ROW_OUT_6_PIN, HIGH);
-  if (digitalReadFast (ROW_IN_7_PIN) == LOW) digitalWriteFast (ROW_OUT_7_PIN, HIGH);
-  if (digitalReadFast (ROW_IN_8_PIN) == LOW) digitalWriteFast (ROW_OUT_8_PIN, HIGH);
+  if (digitalReadFast (ROW_IN_1_PIN) == LOW) {
+    digitalWriteFast (ROW_OUT_1_PIN, HIGH);
+    digitalWriteFast (ROW_ENABLE_PIN, LOW);
+  }
+  if (digitalReadFast (ROW_IN_2_PIN) == LOW) {
+    digitalWriteFast (ROW_OUT_2_PIN, HIGH);
+    digitalWriteFast (ROW_ENABLE_PIN, LOW);
+  }
+  if (digitalReadFast (ROW_IN_3_PIN) == LOW) {
+    digitalWriteFast (row_out_3_pin, HIGH);
+    digitalWriteFast (ROW_ENABLE_PIN, LOW);
+  }
+  if (digitalReadFast (ROW_IN_4_PIN) == LOW) {
+    digitalWriteFast (row_out_4_pin, HIGH);
+    digitalWriteFast (ROW_ENABLE_PIN, LOW);
+  }
+  if (digitalReadFast (ROW_IN_5_PIN) == LOW) {
+    digitalWriteFast (ROW_OUT_5_PIN, HIGH);
+    digitalWriteFast (ROW_ENABLE_PIN, LOW);
+  }
+  if (digitalReadFast (ROW_IN_6_PIN) == LOW) {
+    digitalWriteFast (ROW_OUT_6_PIN, HIGH);
+    digitalWriteFast (ROW_ENABLE_PIN, LOW);
+  }
+  if (digitalReadFast (ROW_IN_7_PIN) == LOW) {
+    digitalWriteFast (ROW_OUT_7_PIN, HIGH);
+    digitalWriteFast (ROW_ENABLE_PIN, LOW);
+  }
+  if (digitalReadFast (ROW_IN_8_PIN) == LOW) {
+    digitalWriteFast (ROW_OUT_8_PIN, HIGH);
+    digitalWriteFast (ROW_ENABLE_PIN, LOW);
+  }
 }
 
 
@@ -6407,8 +6504,8 @@ void setup () {
   digitalWriteFast (ORANGE_LED_PIN, LOW);
   digitalWriteFast (BLUE_LED_PIN, blue_led_off);
 
-  // Initialize the row drive line to on.
-  digitalWriteFast (ROW_ENABLE_PIN, LOW);
+  // Initialize the row drive line to off.
+  digitalWriteFast (ROW_ENABLE_PIN, HIGH);
 
   // Initialize the RS-232 TX line to off.
   digitalWriteFast (UART_TX_PIN, HIGH);
@@ -6588,7 +6685,7 @@ void loop () {
   // For IBM 1620 Jr. - Send ack if requested and previous command's print output has been processed.
   if (emulation == EMULATION_IBM) {
     if (send_ack_IBM) {
-      if ((tb_count > 0) || (pb_count > 0) ||
+      if ((tb_count > 0) || (pb_count > 0) || (interrupt_column != WW_COLUMN_1) ||
           (last_scan_duration > NULL_SCAN_DURATION) || (last_last_scan_duration > NULL_SCAN_DURATION)) return;
       if (Serial_write (CHAR_IBM_ACK) != 1) return;
       Serial_send_now ();
@@ -6946,8 +7043,6 @@ void loop () {
 
 
 void ISR_common () {
-  int ccnt = 0;
-  boolean cols[16] = {FALSE};
 
   // Do not process column scan interrupts while the firmware is initializing.
   if (run_mode == MODE_INITIALIZING) return;
@@ -6959,20 +7054,20 @@ void ISR_common () {
   delayMicroseconds (ISR_DELAY);
 
   // Detect active column(s).
-  if (digitalReadFast (COL_1_PIN) == LOW) {cols[WW_COLUMN_1] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_2_PIN) == LOW) {cols[WW_COLUMN_2] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_3_PIN) == LOW) {cols[WW_COLUMN_3] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_4_PIN) == LOW) {cols[WW_COLUMN_4] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_5_PIN) == LOW) {cols[WW_COLUMN_5] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_6_PIN) == LOW) {cols[WW_COLUMN_6] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_7_PIN) == LOW) {cols[WW_COLUMN_7] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_8_PIN) == LOW) {cols[WW_COLUMN_8] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_9_PIN) == LOW) {cols[WW_COLUMN_9] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_10_PIN) == LOW) {cols[WW_COLUMN_10] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_11_PIN) == LOW) {cols[WW_COLUMN_11] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_12_PIN) == LOW) {cols[WW_COLUMN_12] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_13_PIN) == LOW) {cols[WW_COLUMN_13] = TRUE; ++ccnt;}
-  if (digitalReadFast (COL_14_PIN) == LOW) {cols[WW_COLUMN_14] = TRUE; ++ccnt;}
+  boolean col_1 = (digitalReadFast (COL_1_PIN) == LOW);
+  boolean col_2 = (digitalReadFast (COL_2_PIN) == LOW);
+  boolean col_3 = (digitalReadFast (COL_3_PIN) == LOW);
+  boolean col_4 = (digitalReadFast (COL_4_PIN) == LOW);
+  boolean col_5 = (digitalReadFast (COL_5_PIN) == LOW);
+  boolean col_6 = (digitalReadFast (COL_6_PIN) == LOW);
+  boolean col_7 = (digitalReadFast (COL_7_PIN) == LOW);
+  boolean col_8 = (digitalReadFast (COL_8_PIN) == LOW);
+  boolean col_9 = (digitalReadFast (COL_9_PIN) == LOW);
+  boolean col_10 = (digitalReadFast (COL_10_PIN) == LOW);
+  boolean col_11 = (digitalReadFast (COL_11_PIN) == LOW);
+  boolean col_12 = (digitalReadFast (COL_12_PIN) == LOW);
+  boolean col_13 = (digitalReadFast (COL_13_PIN) == LOW);
+  boolean col_14 = (digitalReadFast (COL_14_PIN) == LOW);
 
   // Initial sync to column 1.
   if (interrupt_column == WW_COLUMN_NULL) {
@@ -6981,116 +7076,124 @@ void ISR_common () {
   }
 
   // Process column 1 scan.
-  if (cols[WW_COLUMN_1] && ((interrupt_column == WW_COLUMN_14) || (interrupt_column == WW_COLUMN_1))) {
+  if (col_1 && !col_2 && ((interrupt_column == WW_COLUMN_14) || (interrupt_column == WW_COLUMN_1))) {
     if (interrupt_column == WW_COLUMN_14) {  // Initial scan assert row, repeat scan leave row asserted.
       interrupt_column = WW_COLUMN_1;
       ISR_column_1 ();
       last_last_scan_duration = last_scan_duration;
       if (last_scan_time != 0UL) last_scan_duration = interrupt_time - last_scan_time;
       last_scan_time = interrupt_time;
-      if (last_scan_duration >= LONG_SCAN_DURATION) {
+      if (last_scan_duration < SHORT_SCAN_DURATION) {
+        Report_warning (WARNING_SHORT_SCAN);
+      } else if (last_scan_duration > LONG_SCAN_DURATION) {
         Report_warning (WARNING_LONG_SCAN);
       }
     }
 
   // Process column 2 scan.
-  } else if (cols[WW_COLUMN_2] && ((interrupt_column == WW_COLUMN_1) || (interrupt_column == WW_COLUMN_2))) {
+  } else if (col_2 && !col_3 && ((interrupt_column == WW_COLUMN_1) || (interrupt_column == WW_COLUMN_2))) {
     if (interrupt_column == WW_COLUMN_1) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_2;
        ISR_column_2 ();
     }
 
   // Process column 3 scan.
-  } else if (cols[WW_COLUMN_3] && ((interrupt_column == WW_COLUMN_2) || (interrupt_column == WW_COLUMN_3))) {
+  } else if (col_3 && !col_4 && ((interrupt_column == WW_COLUMN_2) || (interrupt_column == WW_COLUMN_3))) {
     if (interrupt_column == WW_COLUMN_2) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_3;
        ISR_column_3 ();
     }
 
   // Process column 4 scan.
-  } else if (cols[WW_COLUMN_4] && ((interrupt_column == WW_COLUMN_3) || (interrupt_column == WW_COLUMN_4))) {
+  } else if (col_4 && !col_5 && ((interrupt_column == WW_COLUMN_3) || (interrupt_column == WW_COLUMN_4))) {
     if (interrupt_column == WW_COLUMN_3) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_4;
        ISR_column_4 ();
     }
 
   // Process column 5 scan.
-  } else if (cols[WW_COLUMN_5] && ((interrupt_column == WW_COLUMN_4) || (interrupt_column == WW_COLUMN_5))) {
+  } else if (col_5 && !col_6 && ((interrupt_column == WW_COLUMN_4) || (interrupt_column == WW_COLUMN_5))) {
     if (interrupt_column == WW_COLUMN_4) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_5;
        ISR_column_5 ();
     }
 
   // Process column 6 scan.
-  } else if (cols[WW_COLUMN_6] && ((interrupt_column == WW_COLUMN_5) || (interrupt_column == WW_COLUMN_6))) {
+  } else if (col_6 && !col_7 && ((interrupt_column == WW_COLUMN_5) || (interrupt_column == WW_COLUMN_6))) {
     if (interrupt_column == WW_COLUMN_5) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_6;
        ISR_column_6 ();
     }
 
   // Process column 7 scan.
-  } else if (cols[WW_COLUMN_7] && ((interrupt_column == WW_COLUMN_6) || (interrupt_column == WW_COLUMN_7))) {
+  } else if (col_7 && !col_8 && ((interrupt_column == WW_COLUMN_6) || (interrupt_column == WW_COLUMN_7))) {
     if (interrupt_column == WW_COLUMN_6) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_7;
        ISR_column_7 ();
     }
 
   // Process column 8 scan.
-  } else if (cols[WW_COLUMN_8] && ((interrupt_column == WW_COLUMN_7) || (interrupt_column == WW_COLUMN_8))) {
+  } else if (col_8 && !col_9 && ((interrupt_column == WW_COLUMN_7) || (interrupt_column == WW_COLUMN_8))) {
     if (interrupt_column == WW_COLUMN_7) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_8;
        ISR_column_8 ();
     }
 
   // Process column 9 scan.
-  } else if (cols[WW_COLUMN_9] && ((interrupt_column == WW_COLUMN_8) || (interrupt_column == WW_COLUMN_9))) {
+  } else if (col_9 && !col_10 && ((interrupt_column == WW_COLUMN_8) || (interrupt_column == WW_COLUMN_9))) {
     if (interrupt_column == WW_COLUMN_8) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_9;
        ISR_column_9 ();
     }
 
   // Process column 10 scan.
-  } else if (cols[WW_COLUMN_10] && ((interrupt_column == WW_COLUMN_9) || (interrupt_column == WW_COLUMN_10))) {
+  } else if (col_10 && !col_11 && ((interrupt_column == WW_COLUMN_9) || (interrupt_column == WW_COLUMN_10))) {
     if (interrupt_column == WW_COLUMN_9) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_10;
        ISR_column_10 ();
     }
 
   // Process column 11 scan.
-  } else if (cols[WW_COLUMN_11] && ((interrupt_column == WW_COLUMN_10) || (interrupt_column == WW_COLUMN_11))) {
+  } else if (col_11 && !col_12 && ((interrupt_column == WW_COLUMN_10) || (interrupt_column == WW_COLUMN_11))) {
     if (interrupt_column == WW_COLUMN_10) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_11;
        ISR_column_11 ();
     }
 
   // Process column 12 scan.
-  } else if (cols[WW_COLUMN_12] && ((interrupt_column == WW_COLUMN_11) || (interrupt_column == WW_COLUMN_12))) {
+  } else if (col_12 && !col_13 && ((interrupt_column == WW_COLUMN_11) || (interrupt_column == WW_COLUMN_12))) {
     if (interrupt_column == WW_COLUMN_11) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_12;
        ISR_column_12 ();
     }
 
   // Process column 13 scan.
-  } else if (cols[WW_COLUMN_13] && ((interrupt_column == WW_COLUMN_12) || (interrupt_column == WW_COLUMN_13))) {
+  } else if (col_13 && !col_14 && ((interrupt_column == WW_COLUMN_12) || (interrupt_column == WW_COLUMN_13))) {
     if (interrupt_column == WW_COLUMN_12) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_13;
        ISR_column_13 ();
     }
 
   // Process column 14 scan.
-  } else if (cols[WW_COLUMN_14] && ((interrupt_column == WW_COLUMN_13) || (interrupt_column == WW_COLUMN_14))) {
+  } else if (col_14 && !col_1 && ((interrupt_column == WW_COLUMN_13) || (interrupt_column == WW_COLUMN_14))) {
     if (interrupt_column == WW_COLUMN_13) {  // Initial scan assert row, repeat scan leave row asserted.
        interrupt_column = WW_COLUMN_14;
        ISR_column_14 ();
     }
 
-  // Column scan out of order.
-  } else {  // Column scan out of order.
+  // Process out-of-order column 1 (shift) scan.
+  } else if (col_1 && !col_2 && (column_1_row_pin != ROW_OUT_NO_PIN)) {
     Clear_all_row_lines ();
-    if (ccnt == 1) {  // Preserve shift and code conditions.
-      if (cols[WW_COLUMN_1] && (column_1_row_pin != ROW_OUT_NO_PIN)) digitalWriteFast (column_1_row_pin, HIGH);
-      if (cols[WW_COLUMN_5] && (column_5_row_pin != ROW_OUT_NO_PIN)) digitalWriteFast (column_5_row_pin, HIGH);
-    }  
+    digitalWriteFast (column_1_row_pin, HIGH);
+
+  // Process out-of-order column 5 (code) scan.
+  } else if (col_5 && !col_6 && (column_5_row_pin != ROW_OUT_NO_PIN)) {
+    Clear_all_row_lines ();
+    digitalWriteFast (column_5_row_pin, HIGH);
+
+  // Unexpected column scan.
+  } else {
+    Clear_all_row_lines ();
     Report_warning (WARNING_UNEXPECTED_SCAN);
   }
 }
@@ -7155,7 +7258,7 @@ inline void ISR_column_3 () {
 }
 
 //
-// Column 4 ISR for keys:  <space>, <required space>, L Mar, T Clr
+// Column 4 ISR for keys:  <space>, <required space>, <load paper>, L Mar, T Clr
 //
 inline void ISR_column_4 () {
 
@@ -7168,6 +7271,7 @@ inline void ISR_column_4 () {
   // Accounting for bounce shadow, if any keyboard row is asserted take appropriate action.
   if (interrupt_time >= key_shadow_times[WW_KEY_SPACE_REQSPACE])
                                                             Process_repeating_key (ROW_IN_1_PIN, WW_KEY_SPACE_REQSPACE);
+  if (interrupt_time >= key_shadow_times[WW_KEY_LOADPAPER]) Process_key (ROW_IN_2_PIN, WW_KEY_LOADPAPER);
   // if (interrupt_time >= key_shadow_times[WW_KEY_X13_43]) Process_key (ROW_IN_3_PIN, WW_KEY_X13_43);
   if (interrupt_time >= key_shadow_times[WW_KEY_LMar]) Process_key (ROW_IN_4_PIN, WW_KEY_LMar);
   // if (interrupt_time >= key_shadow_times[WW_KEY_X12_45]) Process_key (ROW_IN_5_PIN, WW_KEY_X12_45);
@@ -7553,6 +7657,7 @@ void Initialize_configuration_settings (boolean reset) {
 
 // Clear all row drive lines.
 inline void Clear_all_row_lines () {
+  digitalWriteFast (ROW_ENABLE_PIN, HIGH);
   digitalWriteFast (ROW_OUT_1_PIN, LOW);
   digitalWriteFast (ROW_OUT_2_PIN, LOW);
   digitalWriteFast (row_out_3_pin, LOW);
@@ -7914,11 +8019,17 @@ boolean Print_string (const struct print_info *str) {
   return TRUE;
 }
 
-//  Wait for the print buffer to be empty.
+// Test if printing has caught up.
+inline boolean Test_printing_caught_up () {
+  return ((interrupt_column == WW_COLUMN_1) &&
+          (last_scan_duration <= NULL_SCAN_DURATION) && (last_last_scan_duration <= NULL_SCAN_DURATION));
+}
+
+// Wait for the print buffer to be empty.
 inline void Wait_print_buffer_empty () {
-    while ((pb_count > 0) ||
+    while ((pb_count > 0) || (interrupt_column != WW_COLUMN_1) ||
            (last_scan_duration > NULL_SCAN_DURATION) || (last_last_scan_duration > NULL_SCAN_DURATION)) {
-      delay (10);
+      delay (1);
     }
 }
 
@@ -7926,7 +8037,15 @@ inline void Wait_print_buffer_empty () {
 inline byte Test_print (int column) {
   byte pchr = print_buffer[pb_read];
 
-  // Skip skip print codes.
+  // Test if printing has caught up.
+  if (pchr == WW_CATCH_UP) {
+    if (!Test_printing_caught_up ()) return ROW_OUT_NO_PIN;
+    if (++pb_read >= SIZE_PRINT_BUFFER) pb_read = 0;
+    pchr = print_buffer[pb_read];
+    Increment_counter (&pb_count, -1);
+  }
+
+  // Skip any skip print codes.
   while (pchr == WW_SKIP) {
     if (++pb_read >= SIZE_PRINT_BUFFER) pb_read = 0;
     pchr = print_buffer[pb_read];
@@ -7936,7 +8055,10 @@ inline byte Test_print (int column) {
   // If next print code is in this column, assert associated row line.
   if (((pchr >> 4) & 0x0f) == column) {
     byte pin = row_out_pins[pchr & 0x0f];
-    if (pin != ROW_OUT_NO_PIN) digitalWriteFast (pin, HIGH);
+    if (pin != ROW_OUT_NO_PIN) {
+      digitalWriteFast (pin, HIGH);
+      digitalWriteFast (ROW_ENABLE_PIN, LOW);
+    }
     if (++pb_read >= SIZE_PRINT_BUFFER) pb_read = 0;
     Increment_counter (&pb_count, -1);
     return pin;
@@ -8906,6 +9028,9 @@ void Calibrate_printer_timing () {
   Calibrate_string ("TIMING_SHIFT", &WW_PRINT_A, 77);
   Calibrate_string ("TIMING_CODE", &WW_PRINT_PARAGRAPH, 77);
 
+  // Calibrate stress case alphanumeric string.
+  Calibrate_string ("TIMING_NOSHIFT,SHIFT,CODE", &WW_PRINT_QV079, -15);
+
   // Calibrate IBM 1620 Jr. print strings.
   Calibrate_string ("TIMING_IBM_SLASH_0", &IBM_PRINT_SLASH_0, 77);
   Calibrate_string ("TIMING_IBM_FLAG_SLASH_0", &IBM_PRINT_FLAG_SLASH_0, 77);
@@ -9038,10 +9163,31 @@ int Measure_string (struct print_info *str, int len) {
   digitalWriteFast (BLUE_LED_PIN, blue_led_off);
 
   // Print string.
-  for (int i = 0; i < len; ++i) Print_string ((const struct print_info *)(str));
-  while ((pb_read != pb_write) ||
+  if (len >= 0) {
+    for (int i = 0; i < len; ++i) Print_string ((const struct print_info *)(str));
+  } else {  // Inject stress case alphanumeric string.
+    int delta = str->timing - WW_PRINT_QV079.timing;
+    struct print_info str_Q = WW_PRINT_Q;
+    str_Q.timing += delta;
+    struct print_info str_V = WW_PRINT_V;
+    str_V.timing += delta;
+    struct print_info str_0 = WW_PRINT_0;
+    str_0.timing += delta;
+    struct print_info str_7 = WW_PRINT_7;
+    str_7.timing += delta;
+    struct print_info str_9 = WW_PRINT_9;
+    str_9.timing += delta;
+    for (int i = 0; i > len; --i) {
+      Print_string (&str_Q);
+      Print_string (&str_V);
+      Print_string (&str_0);
+      Print_string (&str_7);
+      Print_string (&str_9);
+    }
+  }
+  while ((pb_read != pb_write) || (interrupt_column != WW_COLUMN_1) ||
          (last_scan_duration > NULL_SCAN_DURATION) || (last_last_scan_duration > NULL_SCAN_DURATION)) {
-    delay (20);
+    delay (1);
   }
   delay (2000);
   wcnt = warning_counts[WARNING_LONG_SCAN];
