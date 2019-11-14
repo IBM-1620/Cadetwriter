@@ -18,7 +18,7 @@
 //                      Teensyduino 1.48 (https://www.pjrc.com/teensy/td_download.html).
 //                      Compile options - Teensy 3.5, USB Serial, 120 MHz, Fastest with LTO.
 //
-//  Memory:             78748 bytes (15%) of program storage space.
+//  Memory:             78688 bytes (15%) of program storage space.
 //                      107988 bytes (41%) of dynamic memory for global variables.
 //
 //  Documentation:      IBM 1620 Jr. Console Typewriter Protocol, version 1.10, 5/24/2019.
@@ -67,6 +67,7 @@
 //                      5R5  11/8/2019  Added support for semi-automatic paper loading.
 //                                      Increased time for ISR delay to deal with overlapping column scans.
 //                                      Adjusted timing of unshifted, shifted, and code characters.
+//                      5R6 11/12/2019  Corrected set of available baud rates.
 //
 //  Future ideas:       1. Support other Wheelwriter models.
 //
@@ -753,31 +754,20 @@
 //
 //  RS232 serial - The Teensy 3.5 microcontroller includes UART hardware support for 6 RS232 interfaces.  The Serial
 //                 Interface Board uses the first RS232 port (UART0) for host computer communication.  There are
-//                 limitations to the baud rates supported because UART0 uses a 13-bit divider on the 120MHz system
-//                 clock.  Specifically, only baud rates 1800 thru 7500000 can be used.  The following table gives
-//                 actual baud rates and the errors from the desired baud rates.  Only baud rates with an error of less
-//                 than 2.5% are usable.
+//                 limitations to the baud rates supported.  The following table gives the available baud rates and
+//                 their error.  Only baud rates with an error of less than 2.5% are usable.  In addition, the MAX3232
+//                 serial line driver/receiver cannot handle baud rates greater than 250000.  So, only baud rates 1200
+//                 thru 230400 can be used.
 //
-//                            Desired    Actual             |   Desired      Actual
-//                               Baud      Baud     Error   |      Baud        Baud   Error
-//                            ------------------------------+------------------------------
-//                                 50   1831.07  3562.14%   |     76800    76800.00   0.00%
-//                                 75   1831.07  2341.42%   |    115200   115218.43   0.02%
-//                                110   1831.07  1564.61%   |    230400   230326.30  -0.03%
-//                                134   1831.07  1266.47%   |    250000   250000.00   0.00%
-//                                150   1831.07  1120.71%   |    460800   460652.59  -0.03%
-//                                200   1831.07   815.53%   |    500000   500000.00   0.00%
-//                                300   1831.07   510.36%   |    921600   923076.92   0.16%
-//                                600   1831.07   205.18%   |   1000000  1000000.00   0.00%
-//                               1200   1831.07    52.59%   |   2000000  2000000.00   0.00%
-//                               1800   1831.07     1.73%   |   3000000  3000000.00   0.00%
-//                               2400   2400.00     0.00%   |   4608000  4615384.62   0.16%
-//                               4800   4800.00     0.00%   |   5000000  5000000.00   0.00%
-//                               9600   9600.00     0.00%   |   6000000  6000000.00   0.00%
-//                              19200  19200.00     0.00%   |   7000000  7058823.53   0.84%
-//                              31250  31250.00     0.00%   |   7500000  7500000.00   0.00%
-//                              38400  38400.00     0.00%   |   8000000  7500000.00  -6.25%
-//                              57600  57595.39    -0.01%   |
+//                              Baud    Error    |    Baud    Error    |     Baud    Error
+//                            -------------------+---------------------+-------------------
+//                                50  2341.42%   |     600   102.59%   |    38400     0.00%
+//                                75  1564.61%   |    1200     0.00%   |    57600     0.01%
+//                               110  1266.47%   |    1800     0.00%   |    76800     0.00%
+//                               134  1120.71%   |    2400     0.00%   |   115200     0.02%
+//                               150   815.53%   |    4800     0.00%   |   230400    -0.03%
+//                               200   510.36%   |    9600     0.00%   |   460800    -0.03%
+//                               300   205.18%   |   19200     0.00%   |   921600     0.16%
 //
 //  Board revisions - This firmware automatically supports all revisions of the Serial Interface Board.
 //                    1.6: The first production board.  The basic board has a hardware problem with random characters
@@ -1353,7 +1343,7 @@
 #define BAUD_200         6  // 200 baud.   Can't use with UART0.
 #define BAUD_300         7  // 300 baud.   Can't use with UART0.
 #define BAUD_600         8  // 600 baud.   Can't use with UART0.
-#define BAUD_1200        9  // 1200 baud.  Can't use with UART0.
+#define BAUD_1200        9  // 1200 baud.
 #define BAUD_1800       10  // 1800 baud.
 #define BAUD_2400       11  // 2400 baud.
 #define BAUD_4800       12  // 4800 baud.
@@ -1364,8 +1354,8 @@
 #define BAUD_76800      17  // 76800 baud.
 #define BAUD_115200     18  // 115200 baud.
 #define BAUD_230400     19  // 230400 baud.
-#define BAUD_460800     20  // 460800 baud.
-#define BAUD_921600     21  // 921600 baud.
+#define BAUD_460800     20  // 460800 baud.  Not supported by MAX3232.
+#define BAUD_921600     21  // 921600 baud.  Not supported by MAX3232.
 
 #define NUM_BAUDS       22  // Number of baud values.
 
@@ -2028,7 +2018,8 @@ const int data_parity_stops[NUM_DPSS] = {0, SERIAL_7O1, SERIAL_7E1, SERIAL_8N1, 
                                          SERIAL_8O2, SERIAL_8E2};
 const char* data_parity_stops_text[NUM_DPSS] = {NULL, "7o1", "7e1", "8n1", "8o1", "8e1", "8n2", "8o2", "8e2"};
 
-// Baud rate table.  Note: Baud rates below 1800 are not usable on Teensy 3.5.
+// Baud rate table.  Note: Baud rates below 1200 are not usable on Teensy 3.5 and above 230400 are not supported by
+//                         MAX3232.
 const unsigned long baud_rates[NUM_BAUDS] = {0ul, 50ul, 75ul, 110ul, 134ul, 150ul, 200ul, 300ul, 600ul, 1200ul,
                                              1800ul, 2400ul, 4800ul, 9600ul, 19200ul, 38400ul, 57600ul, 76800ul,
                                              115200ul, 230400ul, 460800ul, 921600ul};
@@ -8508,7 +8499,7 @@ byte Read_baud_setting (const char str[], byte value) {
   // Print prompt.
   Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
   Print_characters (str);
-  Print_characters (" [1800-921600, ");  Print_unsigned_long (baud_rates[value], 0);  Print_characters ("]: ");
+  Print_characters (" [1200-230400, ");  Print_unsigned_long (baud_rates[value], 0);  Print_characters ("]: ");
   Space_to_column (COLUMN_RESPONSE);
 
   // Read and print response.
@@ -8522,6 +8513,10 @@ byte Read_baud_setting (const char str[], byte value) {
         if (chr == '1') {
           val = BAUD_115200;
           Print_characters ("15200\r");
+          break;
+        } else if (chr == '2') {
+          val = BAUD_1200;
+          Print_characters ("200\r");
           break;
         } else if (chr == '8') {
           val = BAUD_1800;
@@ -8557,19 +8552,8 @@ byte Read_baud_setting (const char str[], byte value) {
       break;
 
     } else if (chr == '4') {
-      Print_character (chr);
-      while (TRUE) {
-        chr = Read_setup_character ();
-        if (chr == '6') {
-          val = BAUD_460800;
-          Print_characters ("60800\r");
-          break;
-        } else if (chr == '8') {
-          val = BAUD_4800;
-          Print_characters ("800\r");
-          break;
-        }
-      }
+      val = BAUD_4800;
+      Print_characters ("4800\r");
       break;
 
     } else if (chr == '5') {
@@ -8583,19 +8567,8 @@ byte Read_baud_setting (const char str[], byte value) {
       break;
 
     } else if (chr == '9') {
-      Print_character (chr);
-      while (TRUE) {
-        chr = Read_setup_character ();
-        if (chr == '2') {
-          val = BAUD_921600;
-          Print_characters ("21600\r");
-          break;
-        } else if (chr == '6') {
-          val = BAUD_9600;
-          Print_characters ("600\r");
-          break;
-        }
-      }
+      val = BAUD_9600;
+      Print_characters ("9600\r");
       break;
 
     } else if (chr == CHAR_ASCII_CR) {
