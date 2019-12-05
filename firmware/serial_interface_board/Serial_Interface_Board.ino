@@ -8529,11 +8529,11 @@ byte Read_baud_setting (const char str[], byte value) {
 
   // Read and print response
   while (TRUE) {
-    chr1 = Read_setup_character_in ("1234567");
+    chr1 = Read_setup_character_in ("12345679");
     Print_character (chr1);
     switch (chr1) {
       case '1':
-        chr2 = Read_setup_character_in ("1289");
+        chr2 = Read_setup_character_in ("123589");
         Print_character (chr2);
         switch (chr2) {
           case '1':
@@ -8549,6 +8549,12 @@ byte Read_baud_setting (const char str[], byte value) {
           case '2':
             Print_characters ("00\r");
             return BAUD_1200;
+          case '3':
+            Print_characters ("4\r");
+            return BAUD_134;
+          case '5':
+            Print_characters ("0\r");
+            return BAUD_150;
           case '8':
             Print_characters ("00\r");
             return BAUD_1800;
@@ -8605,6 +8611,9 @@ byte Read_baud_setting (const char str[], byte value) {
             Print_characters ("6800\r");
             return BAUD_76800;
         }
+      case '9':
+        Print_characters("600\r");
+        return BAUD_9600;
     }
   }
 }
