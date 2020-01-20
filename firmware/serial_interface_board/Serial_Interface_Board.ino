@@ -70,6 +70,7 @@
 //                                      Adjusted timing of unshifted, shifted, and code characters.
 //                      5R6 11/12/2019  Corrected set of available baud rates.
 //                      5R6ptw (TBD)    Adopted SlowSoftSerial library to allow slow baud rates.
+//                      5R6ptw2 (TBD)   Restored handling of Enter to accept old baud rate.
 //
 //  Future ideas:       1. Support other Wheelwriter models.
 //
@@ -809,7 +810,7 @@
 
 // Firmware version values.
 #define VERSION       56
-#define VERSION_TEXT  "5R6ptw"
+#define VERSION_TEXT  "5R6ptw2"
 
 // Physical I/O port pins.
 #define PTC_5   13  // Embedded Teensy 3.5 board orange LED.
@@ -8528,94 +8529,97 @@ byte Read_baud_setting (const char str[], byte value) {
   Space_to_column (COLUMN_RESPONSE);
 
   // Read and print response
-  while (TRUE) {
-    chr1 = Read_setup_character_in ("12345679");
-    Print_character (chr1);
-    switch (chr1) {
-      case '1':
-        chr2 = Read_setup_character_in ("123589");
-        Print_character (chr2);
-        switch (chr2) {
-          case '1':
-            chr3 = Read_setup_character_in ("05");
-            switch (chr3) {
-              case '0':
-                Print_characters ("0\r");
-                return BAUD_110;
-              case '5':
-                Print_characters ("5200\r");
-                return BAUD_115200;
-            }
-          case '2':
-            Print_characters ("00\r");
-            return BAUD_1200;
-          case '3':
-            Print_characters ("4\r");
-            return BAUD_134;
-          case '5':
-            Print_characters ("0\r");
-            return BAUD_150;
-          case '8':
-            Print_characters ("00\r");
-            return BAUD_1800;
-          case '9':
-            Print_characters ("200\r");
-            return BAUD_19200;
-        }
-      case '2':
-        chr2 = Read_setup_character_in ("034");
-        switch (chr2) {
-          case '0':
-            Print_characters ("00\r");
-            return BAUD_200;
-          case '3':
-            Print_characters ("30400\r");
-            return BAUD_230400;
-          case '4':
-            Print_characters ("400\r");
-            return BAUD_2400;
-        }
-      case '3':
-        chr2 = Read_setup_character_in ("08");
-        switch (chr2) {
-          case '0':
-            Print_characters ("00\r");
-            return BAUD_300;
-          case '8':
-            Print_characters ("8400\r");
-            return BAUD_38400;
-        }
-      case '4':
-        Print_characters ("800\r");
-        return BAUD_4800;
-      case '5':
-        chr2 = Read_setup_character_in ("07");
-        switch (chr2) {
-          case '0':
-            Print_characters ("0\r");
-            return BAUD_50;
-          case '7':
-            Print_characters ("7600\r");
-            return BAUD_57600;
-        }
-      case '6':
-        Print_characters ("00\r");
-        return BAUD_600;
-      case '7':
-        chr2 = Read_setup_character_in ("56");
-        switch (chr2) {
-          case '5':
-            Print_characters ("5\r");
-            return BAUD_75;
-          case '6':
-            Print_characters ("6800\r");
-            return BAUD_76800;
-        }
-      case '9':
-        Print_characters("600\r");
-        return BAUD_9600;
-    }
+  chr1 = Read_setup_character_in ("12345679\r");
+  if (chr1 == '\r') {
+    Print_unsigned_long (baud_rates[value], 0);  Print_character('\r');
+    return value;
   }
+  Print_character (chr1);
+  switch (chr1) {
+    case '1':
+      chr2 = Read_setup_character_in ("123589");
+      Print_character (chr2);
+      switch (chr2) {
+        case '1':
+          chr3 = Read_setup_character_in ("05");
+          switch (chr3) {
+            case '0':
+              Print_characters ("0\r");
+              return BAUD_110;
+            case '5':
+              Print_characters ("5200\r");
+              return BAUD_115200;
+          }
+        case '2':
+          Print_characters ("00\r");
+          return BAUD_1200;
+        case '3':
+          Print_characters ("4\r");
+          return BAUD_134;
+        case '5':
+          Print_characters ("0\r");
+          return BAUD_150;
+        case '8':
+          Print_characters ("00\r");
+          return BAUD_1800;
+        case '9':
+          Print_characters ("200\r");
+          return BAUD_19200;
+      }
+    case '2':
+      chr2 = Read_setup_character_in ("034");
+      switch (chr2) {
+        case '0':
+          Print_characters ("00\r");
+          return BAUD_200;
+        case '3':
+          Print_characters ("30400\r");
+          return BAUD_230400;
+        case '4':
+          Print_characters ("400\r");
+          return BAUD_2400;
+      }
+    case '3':
+      chr2 = Read_setup_character_in ("08");
+      switch (chr2) {
+        case '0':
+          Print_characters ("00\r");
+          return BAUD_300;
+        case '8':
+          Print_characters ("8400\r");
+          return BAUD_38400;
+      }
+    case '4':
+      Print_characters ("800\r");
+      return BAUD_4800;
+    case '5':
+      chr2 = Read_setup_character_in ("07");
+      switch (chr2) {
+        case '0':
+          Print_characters ("0\r");
+          return BAUD_50;
+        case '7':
+          Print_characters ("7600\r");
+          return BAUD_57600;
+      }
+    case '6':
+      Print_characters ("00\r");
+      return BAUD_600;
+    case '7':
+      chr2 = Read_setup_character_in ("56");
+      switch (chr2) {
+        case '5':
+          Print_characters ("5\r");
+          return BAUD_75;
+        case '6':
+          Print_characters ("6800\r");
+          return BAUD_76800;
+      }
+    case '9':
+      Print_characters("600\r");
+      return BAUD_9600;
+  }
+  return value;     // only if we have missed a case above
 }
 
 // Read a parity setting.
