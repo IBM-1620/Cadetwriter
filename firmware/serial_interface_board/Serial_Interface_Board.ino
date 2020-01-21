@@ -71,6 +71,7 @@
 //                      5R6 11/12/2019  Corrected set of available baud rates.
 //                      5R6ptw (TBD)    Adopted SlowSoftSerial library to allow slow baud rates.
 //                      5R6ptw2 (TBD)   Restored handling of Enter to accept old baud rate.
+//                                      Fixed handling of serial mode setting in EEPROM (refactored).
 //
 //  Future ideas:       1. Support other Wheelwriter models.
 //
@@ -1332,11 +1333,12 @@
 // Serial types.
 #define SERIAL_UNDEFINED  0  // Undefined serial setting.
 #define SERIAL_USB        1  // USB serial.
-#define SERIAL_RS232      2  // RS-232 serial.
-#define SERIAL_RS232_SLOW 3  // RS-232 serial via SlowSoftSerial bit-banging.
-// SERIAL_RS232_SLOW is not stored in EEPROM or selectable in the configuration menu.
-// It is selected automatically when SERIAL_RS232 is configured and the baud rate
-// is too slow for the hardware UART.
+#define SERIAL_RS232      2  // RS-232 serial (UART or SlowSoftSerial).
+
+// RS232 types (not stored in EEPROM)
+#define RS232_UNDEFINED   0  // Undefined RS232 mode.
+#define RS232_UART        1  // Hardware UART.
+#define RS232_SLOW        2  // SlowSoftSerial port.
 
 // Duplex types.
 #define DUPLEX_UNDEFINED  0  // Undefined duplex setting.
@@ -1965,6 +1967,7 @@ const struct print_info WW_PRINT_BEEP          = {SPACING_NONE, TIMING_NONE, &WW
 
 // Serial port for RS232 at slow baud rates.
 SlowSoftSerial slow_serial_port (UART_RX_PIN, UART_TX_PIN);
+volatile byte rs232_mode = RS232_UNDEFINED;
 
 // Serial Interface Board variables.
 volatile int blue_led_on = LOW;
@@ -5983,12 +5986,6 @@ void Update_ASCII_settings () {
   }
   Print_string (&WW_PRINT_CRtn);
 
-  // For configuration purposes there's only SERIAL_USB and SERIAL_RS232,
-  // but for operation we split SERIAL_RS232 and SERIAL_RS232_SLOW.
-  if (serial == SERIAL_RS232 && baud < MINIMUM_HARDWARE_BAUD) {
-    serial = SERIAL_RS232_SLOW;
-  }
-
   // Reset communications if any communication changes.
   if ((oserial != serial) || (oparity != parity) || (obaud != baud) || (odps != dps)) {
     flow_in_on = FALSE;
@@ -7655,11 +7652,7 @@ void Initialize_configuration_settings (boolean reset) {
   // Adjust serial configuration for validity
   if (serial == SERIAL_USB) {
     hwflow = HWFLOW_NONE;
-  } else /* serial == SERIAL_RS232 */ {
-    if (baud < MINIMUM_HARDWARE_BAUD) {
-      serial = SERIAL_RS232_SLOW;
-    }
-  }
+  } 
 }
 
 // Clear all row drive lines.
@@ -8439,7 +8432,7 @@ byte Read_serial_setting (const char str[], byte value) {
   Print_characters (str);
   if (value == SERIAL_USB) {
     Print_characters (" [USB/rs232]: ");
-  } else /* value == SERIAL_RS232 or SERIAL_RS232_SLOW */ {
+  } else /* value == SERIAL_RS232 */ {
     Print_characters (" [usb/RS232]: ");
   }
   Space_to_column (COLUMN_RESPONSE);
@@ -9294,9 +9287,14 @@ void Serial_begin () {
   if (serial == SERIAL_USB) {
     Serial.begin (115200);
   } else if (serial == SERIAL_RS232) {
-    Serial1.begin (baud_rates[baud], data_parity_stops[dps]);
-  } else /* serial == SERIAL_RS232_SLOW */ {
-    slow_serial_port.begin (baud_rates[baud], data_parity_stops_slow[dps]);
+    if (baud >= MINIMUM_HARDWARE_BAUD) {
+      Serial1.begin (baud_rates[baud], data_parity_stops[dps]);
+      Serial1.clear ();   // workaround; clears FIFO scrambling permitted by driver
+      rs232_mode = RS232_UART;
+    } else /* baud rate too slow for UART, switch to SlowSoftSerial */ {
+      slow_serial_port.begin (baud_rates[baud], data_parity_stops_slow[dps]);
+      rs232_mode = RS232_SLOW;
+    }
   }
 }
 
@@ -9304,10 +9302,12 @@ void Serial_begin () {
 void Serial_end (byte port) {
     if (port == SERIAL_USB) {
     Serial.end ();
-  } else if (port == SERIAL_RS232) {
-    Serial1.end ();
-  } else /* port == SERIAL_RS232_SLOW */ {
-    slow_serial_port.end ();
+  } else /* port == SERIAL_RS232 */ {
+    if (rs232_mode == RS232_UART) {
+      Serial1.end ();
+    } else /* rs232_mode == RS232_SLOW */ {
+      slow_serial_port.end ();
+    }
   }
 }
 
@@ -9315,10 +9315,12 @@ void Serial_end (byte port) {
 inline boolean Serial_available () {
   if (serial == SERIAL_USB) {
     return Serial.available ();
-  } else if (serial == SERIAL_RS232) {
-    return Serial1.available ();
-  } else /* serial == SERIAL_RS232_SLOW */ {
-    return slow_serial_port.available();
+  } else /* serial == SERIAL_RS232 */{
+    if (rs232_mode == RS232_UART) {
+      return Serial1.available ();
+    } else /* rs232_mode == RS232_SLOW */ {
+      return slow_serial_port.available ();
+    }
   }
 }
 
@@ -9326,10 +9328,13 @@ inline boolean Serial_available () {
 inline byte Serial_read () {
   if (serial == SERIAL_USB) {
     return Serial.read ();
-  } else if (serial == SERIAL_RS232) {
-    return Serial1.read ();
-  } else /* serial == SERIAL_RS232_SLOW */ {
-    return slow_serial_port.read ();
+  } else /* serial == SERIAL_RS232 */ {
+    if (rs232_mode == RS232_UART) {
+      return Serial1.read ();
+
+    } else /* rs232_mode == RS232_SLOW */ {
+      return slow_serial_port.read ();
+    }
   }
 }
 
@@ -9337,17 +9342,19 @@ inline byte Serial_read () {
 inline int Serial_write (byte chr) {
   if (serial == SERIAL_USB) {
     return Serial.write (chr);
-  } else if (serial == SERIAL_RS232) {
-    if (Serial1.availableForWrite () >= 1) {
-      return Serial1.write (chr);
-    } else {
-      return 0;
-    }
-  } else /* serial == SERIAL_RS232_SLOW */ {
-    if (slow_serial_port.availableForWrite () >= 1) {
-      return slow_serial_port.write (chr);
-    } else {
-      return 0;
+  } else /* serial == SERIAL_RS232 */ {
+    if (rs232_mode == RS232_UART) {
+      if (Serial1.availableForWrite () >= 1) {
+        return Serial1.write (chr);
+      } else {
+        return 0;
+      }
+    } else /* rs232_mode == RS232_SLOW */ {
+      if (slow_serial_port.availableForWrite () >= 1) {
+        return slow_serial_port.write (chr);
+      } else {
+        return 0;
+      }
     }
   }
 }
@@ -9356,7 +9363,7 @@ inline int Serial_write (byte chr) {
 inline void Serial_send_now () {
   if (serial == SERIAL_USB) {
     Serial.send_now ();
-  } else /* serial == SERIAL_RS232 or SERIAL_RS232_SLOW */ {
+  } else /* serial == SERIAL_RS232 */ {
     // async serial does not support (or need) send_now.
   }
 }
