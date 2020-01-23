@@ -19,7 +19,7 @@
 //                      SlowSoftSerial library (https://github.com/MustBeArt/SlowSoftSerial)
 //                      Compile options - Teensy 3.5, USB Serial, 120 MHz, Fastest with LTO.
 //
-//  Memory:             78688 bytes (15%) of program storage space.
+//  Memory:             78448 bytes (14%) of program storage space.
 //                      107988 bytes (41%) of dynamic memory for global variables.
 //
 //  Documentation:      IBM 1620 Jr. Console Typewriter Protocol, version 1.10, 5/24/2019.
@@ -69,8 +69,9 @@
 //                                      Increased time for ISR delay to deal with overlapping column scans.
 //                                      Adjusted timing of unshifted, shifted, and code characters.
 //                      5R6 11/12/2019  Corrected set of available baud rates.
-//                      5R6ptw (TBD)    Adopted SlowSoftSerial library to allow slow baud rates.
-//                      5R6ptw2 (TBD)   Restored handling of Enter to accept old baud rate.
+//                      5R7 12/29/2019  Removed some unneeded timing dependencies.
+//                      5R7ptw (TBD)    Adopted SlowSoftSerial library to allow slow baud rates.
+//                      5R7ptw2 (TBD)   Restored handling of Enter to accept old baud rate.
 //                                      Fixed handling of serial mode setting in EEPROM (refactored).
 //
 //  Future ideas:       1. Support other Wheelwriter models.
@@ -89,7 +90,7 @@
 //
 //                      6. Add pagination support for individual sheets of paper or fan-fold paper.
 //
-//                      7. Add keyboard key which aborts current printout and flushes print buffer.
+//                      7. Add keyboard key which aborts current printout and flushes print & input buffers.
 //
 //                      8. Translate common Unicode characters (e.g., curly quotes) to nearest ASCII equivalents.
 //
@@ -810,8 +811,8 @@
 //**********************************************************************************************************************
 
 // Firmware version values.
-#define VERSION       56
-#define VERSION_TEXT  "5R6ptw2"
+#define VERSION       57
+#define VERSION_TEXT  "5R7ptw2"
 
 // Physical I/O port pins.
 #define PTC_5   13  // Embedded Teensy 3.5 board orange LED.
@@ -1125,7 +1126,6 @@
 #define OFFSET_CODE   (NUM_WW_KEYS + NUM_WW_KEYS)  // Code shifted.
 
 // Keyboard scan timing values (in msec).
-#define NULL_SCAN_DURATION   12UL  // Time for null full scan.
 #define SHORT_SCAN_DURATION  10UL  // Threshold time for Wheelwriter short scans.
 #define LONG_SCAN_DURATION   25UL  // Threshold time for Wheelwriter long scans.
 
@@ -6682,8 +6682,7 @@ void loop () {
   // For IBM 1620 Jr. - Send ack if requested and previous command's print output has been processed.
   if (emulation == EMULATION_IBM) {
     if (send_ack_IBM) {
-      if ((tb_count > 0) || (pb_count > 0) || (interrupt_column != WW_COLUMN_1) ||
-          (last_scan_duration > NULL_SCAN_DURATION) || (last_last_scan_duration > NULL_SCAN_DURATION)) return;
+      if ((tb_count > 0) || (pb_count > 0)) return;
       if (Serial_write (CHAR_IBM_ACK) != 1) return;
       Serial_send_now ();
       send_ack_IBM = FALSE;
@@ -8022,15 +8021,13 @@ boolean Print_string (const struct print_info *str) {
 // Test if printing has caught up.
 inline boolean Test_printing_caught_up () {
   return ((interrupt_column == WW_COLUMN_1) &&
-          (last_scan_duration <= NULL_SCAN_DURATION) && (last_last_scan_duration <= NULL_SCAN_DURATION));
+          (last_scan_duration < LONG_SCAN_DURATION) && (last_last_scan_duration < LONG_SCAN_DURATION));
 }
 
 // Wait for the print buffer to be empty.
 inline void Wait_print_buffer_empty () {
-    while ((pb_count > 0) || (interrupt_column != WW_COLUMN_1) ||
-           (last_scan_duration > NULL_SCAN_DURATION) || (last_last_scan_duration > NULL_SCAN_DURATION)) {
-      delay (1);
-    }
+    while (pb_count > 0) delay (1);
+    delay (2 * LONG_SCAN_DURATION);
 }
 
 // Test column of current print code and assert row line if match, return output pin.
@@ -9191,10 +9188,7 @@ int Measure_string (struct print_info *str, int len) {
       Print_string (&str_9);
     }
   }
-  while ((pb_read != pb_write) || (interrupt_column != WW_COLUMN_1) ||
-         (last_scan_duration > NULL_SCAN_DURATION) || (last_last_scan_duration > NULL_SCAN_DURATION)) {
-    delay (1);
-  }
+  while (pb_read != pb_write) delay (1);
   delay (2000);
   wcnt = warning_counts[WARNING_LONG_SCAN];
   Print_integer (wcnt, 3);
