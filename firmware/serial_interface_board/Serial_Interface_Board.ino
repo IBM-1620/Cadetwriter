@@ -11,19 +11,20 @@
 //  Typewriter:         IBM/Lexmark Wheelwriter 1000, model 6781-024.
 //
 //  Interface boards:   WheelWriter USB Interface Board, v1.6, June 2018.  Retired.
-//                      WheelWriter USB Interface Board, v1.7. May 2019.  Retired.
-//                      WheelWriter Serial Interface Board, v2.0. July 2019.
+//                      WheelWriter USB Interface Board, v1.7, May 2019.  Retired.
+//                      WheelWriter Serial Interface Board, v2.0, July 2019.
 //
 //  Build environment:  Arduino IDE 1.8.12 (https://www.arduino.cc/en/main/software).
 //                      Teensyduino 1.51 (https://www.pjrc.com/teensy/td_download.html).
 //                      SlowSoftSerial library (https://github.com/MustBeArt/SlowSoftSerial).
 //                      Compile options - Teensy 3.5, USB Serial, 120 MHz, Fastest with LTO.
 //
-//  Memory:             88868 bytes (16%) of program storage space.
+//  Memory:             88892 bytes (16%) of program storage space.
 //                      108444 bytes (41%) of dynamic memory for global variables.
 //
 //  Documentation:      IBM 1620 Jr. Console Typewriter Protocol, version 1.10, 5/24/2019.
 //                      IBM 1620 Jr. Console Typewriter Test Program, version 1.10, 5/24/2019.
+//                      IBM Wheelwriter 1000 by Lexmark User's Guide, P/N 1419147, 7/1994.
 //
 //  Authors:            Dave Babcock, Joe Fredrick, Paul Williamson
 //
@@ -74,6 +75,8 @@
 //                                      Fixed corner cases of margin and tab settings.
 //                                      Added a beep when an invalid character is typed in setup mode.
 //                                      Refactored and cleaned up some code.
+//                      5R9  3/21/2020  Expanded the set of invalid setup characters that trigger a beep.
+//                                      Improved global counter synchronization comments.
 //
 //  Future ideas:       1. Support other Wheelwriter models.
 //
@@ -194,13 +197,13 @@
 //                             X  X  Standalone Typewriter emulation.
 //
 //  Synchronization - The Teensy 3.5 contains a single execution core - only one instruction can be executed at a time.
-//                    The executive code does not allow the main program (i.e. loop()) to execute while in an ISR.
+//                    The interrupt system does not allow the main program (i.e. loop()) to execute while in an ISR.
 //                    Therefore, classic semaphores and mutexes cannot be used to guard critical code segments in the
 //                    main program and ISRs.  If the main program were to hold a semaphore, an ISR could never acquire
-//                    it, deadlocking the program.  This firmware is designed so that all data accesses are carefully
-//                    sequenced, or never conflict, or have independent read / write pointers, or are atomic.  All
-//                    global, non-constant data is declared volatile, so every read and write accesses memory and are
-//                    not cached.
+//                    it, deadlocking the program.  This firmware is designed so that all data accesses and updates are
+//                    carefully sequenced or never conflict or have independent read / write pointers or are
+//                    synchronized.  All global, non-constant data is declared volatile, so every read and write
+//                    accesses memory and are not cached.
 //
 //  Column scans - Under normal operating conditions column scans take either 820 microseconds or 3.68 milliseconds.
 //                 There are several cases:
@@ -812,8 +815,8 @@
 //**********************************************************************************************************************
 
 // Firmware version values.
-#define VERSION       58
-#define VERSION_TEXT  "5R8"
+#define VERSION       59
+#define VERSION_TEXT  "5R9"
 
 // Physical I/O port pins.
 #define PTC_5   13  // Embedded Teensy 3.5 board orange LED.
@@ -3860,8 +3863,8 @@ const struct key_action IBM_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <down arrow>
   {ACTION_COMMAND,                                  'Z',   NULL},                     // Z
   {ACTION_COMMAND,                                  'Q',   NULL},                     // Q
-  {ACTION_NONE,                                     0,     NULL},                     //
-  {ACTION_NONE,                                     0,     NULL},                     // <release start>
+  {ACTION_COMMAND,                                  '~',   NULL},                     // *** unlabelled key
+  {ACTION_COMMAND,                                  '~',   NULL},                     // <release start>
   {ACTION_COMMAND,                                  'A',   NULL},                     // A
   {ACTION_COMMAND,                                  ' ',   NULL},                     // <space>
   {ACTION_NONE,                                     0,     NULL},                     //
@@ -3874,45 +3877,45 @@ const struct key_action IBM_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <code>
   {ACTION_COMMAND,                                  'X',   NULL},                     // X
   {ACTION_COMMAND,                                  'W',   NULL},                     // W
-  {ACTION_NONE,                                     0,     NULL},                     //
+  {ACTION_COMMAND,                                  '~',   NULL},                     // *** unlabelled key
   {ACTION_COMMAND,                                  'S',   NULL},                     // S
   {ACTION_COMMAND,                                  'C',   NULL},                     // C
   {ACTION_COMMAND,                                  'E',   NULL},                     // E
-  {ACTION_NONE,                                     0,     NULL},                     //
+  {ACTION_COMMAND,                                  '~',   NULL},                     // *** unlabelled key
   {ACTION_COMMAND,                                  'D',   NULL},                     // D
   {ACTION_COMMAND,                                  'B',   NULL},                     // B
   {ACTION_COMMAND,                                  'V',   NULL},                     // V
   {ACTION_COMMAND,                                  'T',   NULL},                     // T
   {ACTION_COMMAND,                                  'R',   NULL},                     // R
-  {ACTION_NONE,                                     0,     NULL},                     // @
-  {ACTION_NONE,                                     0,     NULL},                     // (
+  {ACTION_COMMAND,                                  '@',   NULL},                     // @
+  {ACTION_COMMAND,                                  '(',   NULL},                     // (
   {ACTION_COMMAND,                                  'F',   NULL},                     // F
   {ACTION_COMMAND,                                  'G',   NULL},                     // G
   {ACTION_COMMAND,                                  'N',   NULL},                     // N
   {ACTION_COMMAND,                                  'M',   NULL},                     // M, 7
   {ACTION_COMMAND,                                  'Y',   NULL},                     // Y
   {ACTION_COMMAND,                                  'U',   NULL},                     // U, 1
-  {ACTION_NONE,                                     0,     NULL},                     // <flag>
-  {ACTION_NONE,                                     0,     NULL},                     // )
+  {ACTION_COMMAND,                                  '~',   NULL},                     // <flag>
+  {ACTION_COMMAND,                                  ')',   NULL},                     // )
   {ACTION_COMMAND,                                  'J',   NULL},                     // J, 4
   {ACTION_COMMAND,                                  'H',   NULL},                     // H
-  {ACTION_NONE,                                     0,     NULL},                     // ,, 8
-  {ACTION_NONE,                                     0,     NULL},                     //
+  {ACTION_COMMAND,                                  ',',   NULL},                     // ,, 8
+  {ACTION_COMMAND,                                  '~',   NULL},                     // *** unlabelled key
   {ACTION_COMMAND,                                  'I',   NULL},                     // I, 2
-  {ACTION_NONE,                                     0,     NULL},                     // =
-  {ACTION_NONE,                                     0,     NULL},                     // <group mark>
+  {ACTION_COMMAND,                                  '=',   NULL},                     // =
+  {ACTION_COMMAND,                                  '~',   NULL},                     // <group mark>
   {ACTION_COMMAND,                                  'K',   NULL},                     // K, 5
-  {ACTION_NONE,                                     0,     NULL},                     // ., 9
+  {ACTION_COMMAND,                                  '.',   NULL},                     // ., 9
   {ACTION_COMMAND,                                  'O',   NULL},                     // O, 3
-  {ACTION_NONE,                                     0,     NULL},                     // 0
+  {ACTION_COMMAND,                                  '0',   NULL},                     // 0
   {ACTION_COMMAND,                                  'L',   NULL},                     // L, 6
-  {ACTION_NONE,                                     0,     NULL},                     // /
-  {ACTION_NONE,                                     0,     NULL},                     // -
+  {ACTION_COMMAND,                                  '/',   NULL},                     // /
+  {ACTION_COMMAND,                                  '-',   NULL},                     // -
   {ACTION_COMMAND,                                  'P',   NULL},                     // P
-  {ACTION_NONE,                                     0,     NULL},                     // *, .
-  {ACTION_NONE,                                     0,     NULL},                     // <record mark>
-  {ACTION_NONE,                                     0,     NULL},                     // +
-  {ACTION_NONE,                                     0,     NULL},                     // $
+  {ACTION_COMMAND,                                  '*',   NULL},                     // *, .
+  {ACTION_COMMAND,                                  '~',   NULL},                     // <record mark>
+  {ACTION_COMMAND,                                  '+',   NULL},                     // +
+  {ACTION_COMMAND,                                  '$',   NULL},                     // $
   {ACTION_NONE,                                     0,     NULL},                     // <left arrow>
   {ACTION_NONE,                                     0,     NULL},                     // <up arrow>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
@@ -3939,12 +3942,12 @@ const struct key_action IBM_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // <setup>
   {ACTION_NONE,                                     0,     NULL},                     //
   {ACTION_NONE,                                     0,     NULL},                     // <down arrow>
-  {ACTION_NONE,                                     0,     NULL},                     // Z
-  {ACTION_NONE,                                     0,     NULL},                     // Q
-  {ACTION_NONE,                                     0,     NULL},                     //
-  {ACTION_NONE,                                     0,     NULL},                     // <release start>
-  {ACTION_NONE,                                     0,     NULL},                     // A
-  {ACTION_NONE,                                     0,     NULL},                     // <space>
+  {ACTION_COMMAND,                                  'Z',   NULL},                     // Z
+  {ACTION_COMMAND,                                  'Q',   NULL},                     // Q
+  {ACTION_COMMAND,                                  '~',   NULL},                     // *** unlabelled key
+  {ACTION_COMMAND,                                  '~',   NULL},                     // <release start>
+  {ACTION_COMMAND,                                  'A',   NULL},                     // A
+  {ACTION_COMMAND,                                  ' ',   NULL},                     // <space>
   {ACTION_NONE,                                     0,     NULL},                     //
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <left margin>
@@ -3953,54 +3956,54 @@ const struct key_action IBM_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <tab clear>
   {ACTION_NONE,                                     0,     NULL},                     // <code>
-  {ACTION_NONE,                                     0,     NULL},                     // X
-  {ACTION_NONE,                                     0,     NULL},                     // W
-  {ACTION_NONE,                                     0,     NULL},                     //
-  {ACTION_NONE,                                     0,     NULL},                     // S
-  {ACTION_NONE,                                     0,     NULL},                     // C
-  {ACTION_NONE,                                     0,     NULL},                     // E
-  {ACTION_NONE,                                     0,     NULL},                     //
-  {ACTION_NONE,                                     0,     NULL},                     // D
-  {ACTION_NONE,                                     0,     NULL},                     // B
-  {ACTION_NONE,                                     0,     NULL},                     // V
-  {ACTION_NONE,                                     0,     NULL},                     // T
-  {ACTION_NONE,                                     0,     NULL},                     // R
-  {ACTION_NONE,                                     0,     NULL},                     // @
-  {ACTION_NONE,                                     0,     NULL},                     // (
-  {ACTION_NONE,                                     0,     NULL},                     // F
-  {ACTION_NONE,                                     0,     NULL},                     // G
-  {ACTION_NONE,                                     0,     NULL},                     // N
+  {ACTION_COMMAND,                                  'X',   NULL},                     // X
+  {ACTION_COMMAND,                                  'W',   NULL},                     // W
+  {ACTION_COMMAND,                                  '~',   NULL},                     // *** unlabelled key
+  {ACTION_COMMAND,                                  'S',   NULL},                     // S
+  {ACTION_COMMAND,                                  'C',   NULL},                     // C
+  {ACTION_COMMAND,                                  'E',   NULL},                     // E
+  {ACTION_COMMAND,                                  '~',   NULL},                     // *** unlabelled key
+  {ACTION_COMMAND,                                  'D',   NULL},                     // D
+  {ACTION_COMMAND,                                  'B',   NULL},                     // B
+  {ACTION_COMMAND,                                  'V',   NULL},                     // V
+  {ACTION_COMMAND,                                  'T',   NULL},                     // T
+  {ACTION_COMMAND,                                  'R',   NULL},                     // R
+  {ACTION_COMMAND,                                  '@',   NULL},                     // @
+  {ACTION_COMMAND,                                  '(',   NULL},                     // (
+  {ACTION_COMMAND,                                  'F',   NULL},                     // F
+  {ACTION_COMMAND,                                  'G',   NULL},                     // G
+  {ACTION_COMMAND,                                  'N',   NULL},                     // N
   {ACTION_COMMAND,                                  '7',   NULL},                     // M, 7
-  {ACTION_NONE,                                     0,     NULL},                     // Y
+  {ACTION_COMMAND,                                  'Y',   NULL},                     // Y
   {ACTION_COMMAND,                                  '1',   NULL},                     // U, 1
-  {ACTION_NONE,                                     0,     NULL},                     // <flag>
-  {ACTION_NONE,                                     0,     NULL},                     // )
+  {ACTION_COMMAND,                                  '~',   NULL},                     // <flag>
+  {ACTION_COMMAND,                                  ')',   NULL},                     // )
   {ACTION_COMMAND,                                  '4',   NULL},                     // J, 4
-  {ACTION_NONE,                                     0,     NULL},                     // H
+  {ACTION_COMMAND,                                  'H',   NULL},                     // H
   {ACTION_COMMAND,                                  '8',   NULL},                     // ,, 8
-  {ACTION_NONE,                                     0,     NULL},                     //
+  {ACTION_COMMAND,                                  '~',   NULL},                     // *** unlabelled key
   {ACTION_COMMAND,                                  '2',   NULL},                     // I, 2
-  {ACTION_NONE,                                     0,     NULL},                     // =
-  {ACTION_NONE,                                     0,     NULL},                     // <group mark>
+  {ACTION_COMMAND,                                  '=',   NULL},                     // =
+  {ACTION_COMMAND,                                  '~',   NULL},                     // <group mark>
   {ACTION_COMMAND,                                  '5',   NULL},                     // K, 5
   {ACTION_COMMAND,                                  '9',   NULL},                     // ., 9
   {ACTION_COMMAND,                                  '3',   NULL},                     // O, 3
   {ACTION_COMMAND,                                  '0',   NULL},                     // 0
   {ACTION_COMMAND,                                  '6',   NULL},                     // L, 6
-  {ACTION_NONE,                                     0,     NULL},                     // /
-  {ACTION_NONE,                                     0,     NULL},                     // -
-  {ACTION_NONE,                                     0,     NULL},                     // P
-  {ACTION_NONE,                                     0,     NULL},                     // *, .
-  {ACTION_NONE,                                     0,     NULL},                     // <record mark>
-  {ACTION_NONE,                                     0,     NULL},                     // +
-  {ACTION_NONE,                                     0,     NULL},                     // $
+  {ACTION_COMMAND,                                  '/',   NULL},                     // /
+  {ACTION_COMMAND,                                  '-',   NULL},                     // -
+  {ACTION_COMMAND,                                  'P',   NULL},                     // P
+  {ACTION_COMMAND,                                  '.',   NULL},                     // *, .
+  {ACTION_COMMAND,                                  '~',   NULL},                     // <record mark>
+  {ACTION_COMMAND,                                  '+',   NULL},                     // +
+  {ACTION_COMMAND,                                  '$',   NULL},                     // $
   {ACTION_NONE,                                     0,     NULL},                     // <left arrow>
   {ACTION_NONE,                                     0,     NULL},                     // <up arrow>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                     // <backspace>
   {ACTION_NONE,                                     0,     NULL},                     // *** not available on WW1000
-  {ACTION_NONE,                                     0,     NULL},                     // <return>
+  {ACTION_COMMAND,                                  0x0d,  NULL},                     // <return>
   {ACTION_NONE,                                     0,     NULL},                     //
   {ACTION_NONE,                                     0,     NULL},                     // <shift lock>
   {ACTION_NONE,                                     0,     NULL},                     // <right margin>
@@ -4041,7 +4044,7 @@ const struct key_action IBM_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                     // C
   {ACTION_NONE,                                     0,     NULL},                     // E
   {ACTION_NONE,                                     0,     NULL},                     //
-  {ACTION_NONE,                                     0,     NULL},                     // D
+  {ACTION_COMMAND,                                  0x04,  NULL},                     // D
   {ACTION_NONE,                                     0,     NULL},                     // B
   {ACTION_NONE,                                     0,     NULL},                     // V
   {ACTION_NONE,                                     0,     NULL},                     // T
@@ -5629,7 +5632,7 @@ const struct key_action ASCII_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // <right arrow>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
-  {ACTION_NONE,                                     0,     NULL},                      // \, |
+  {ACTION_COMMAND,                                  '\\',  NULL},                      // \, |
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <setup>
   {ACTION_NONE,                                     0,     NULL},                      //
@@ -5637,9 +5640,9 @@ const struct key_action ASCII_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_COMMAND,                                  'z',   NULL},                      // z, Z, SUB
   {ACTION_COMMAND,                                  'q',   NULL},                      // q, Q, DC1/XON
   {ACTION_COMMAND,                                  '1',   NULL},                      // 1, !
-  {ACTION_NONE,                                     0,     NULL},                      // `, ~
+  {ACTION_COMMAND,                                  '`',   NULL},                      // `, ~
   {ACTION_COMMAND,                                  'a',   NULL},                      // a, A, SOH
-  {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_COMMAND,                                  ' ',   NULL},                      // <space>
   {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
@@ -5672,23 +5675,23 @@ const struct key_action ASCII_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_COMMAND,                                  '6',   NULL},                      // 6, ^, RS
   {ACTION_COMMAND,                                  'j',   NULL},                      // j, J, LF
   {ACTION_COMMAND,                                  'h',   NULL},                      // h, H, BS
-  {ACTION_NONE,                                     0,     NULL},                      // ,, <
-  {ACTION_NONE,                                     'j',   NULL},                      // ], }, GS
+  {ACTION_COMMAND,                                  ',',   NULL},                      // ,, <
+  {ACTION_COMMAND,                                  ']',   NULL},                      // ], }, GS
   {ACTION_COMMAND,                                  'i',   NULL},                      // i, I, TAB
   {ACTION_COMMAND,                                  '8',   NULL},                      // 8, *
-  {ACTION_NONE,                                     0,     NULL},                      // =, +
+  {ACTION_COMMAND,                                  '=',   NULL},                      // =, +
   {ACTION_COMMAND,                                  'k',   NULL},                      // k, K, VT
-  {ACTION_NONE,                                     0,     NULL},                      // ., >
+  {ACTION_COMMAND,                                  '.',   NULL},                      // ., >
   {ACTION_COMMAND,                                  'o',   NULL},                      // o, O, SI
   {ACTION_COMMAND,                                  '9',   NULL},                      // 9, (
   {ACTION_COMMAND,                                  'l',   NULL},                      // l, L, FF
-  {ACTION_NONE,                                     0,     NULL},                      // /, ?
-  {ACTION_NONE,                                     0,     NULL},                      // [, {, ESC
+  {ACTION_COMMAND,                                  '/',   NULL},                      // /, ?
+  {ACTION_COMMAND,                                  '[',   NULL},                      // [, {, ESC
   {ACTION_COMMAND,                                  'p',   NULL},                      // p, P, DLE
   {ACTION_COMMAND,                                  '0',   NULL},                      // 0, )
-  {ACTION_NONE,                                     0,     NULL},                      // -, _, US
-  {ACTION_NONE,                                     0,     NULL},                      // ;, :
-  {ACTION_NONE,                                     0,     NULL},                      // ', "
+  {ACTION_COMMAND,                                  '-',   NULL},                      // -, _, US
+  {ACTION_COMMAND,                                  ';',   NULL},                      // ;, :
+  {ACTION_COMMAND,                                  '\'',  NULL},                      // ', "
   {ACTION_NONE,                                     0,     NULL},                      // <left arrow>
   {ACTION_NONE,                                     0,     NULL},                      // <up arrow>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -5710,17 +5713,17 @@ const struct key_action ASCII_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // <right arrow>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
-  {ACTION_NONE,                                     0,     NULL},                      // \, |
+  {ACTION_COMMAND,                                  '|',   NULL},                      // \, |
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <setup>
   {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // <down arrow>
   {ACTION_COMMAND,                                  'Z',   NULL},                      // z, Z, SUB
   {ACTION_COMMAND,                                  'Q',   NULL},                      // q, Q, DC1/XON
-  {ACTION_NONE,                                     0,     NULL},                      // 1, !
-  {ACTION_NONE,                                     0,     NULL},                      // `, ~
+  {ACTION_COMMAND,                                  '!',   NULL},                      // 1, !
+  {ACTION_COMMAND,                                  '~',   NULL},                      // `, ~
   {ACTION_COMMAND,                                  'A',   NULL},                      // a, A, SOH
-  {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_COMMAND,                                  ' ',   NULL},                      // <space>
   {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
@@ -5731,45 +5734,45 @@ const struct key_action ASCII_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // <control>
   {ACTION_COMMAND,                                  'X',   NULL},                      // x, X, CAN
   {ACTION_COMMAND,                                  'W',   NULL},                      // w, W, ETB
-  {ACTION_NONE,                                     0,     NULL},                      // 2, @, NUL
+  {ACTION_COMMAND,                                  '@',   NULL},                      // 2, @, NUL
   {ACTION_COMMAND,                                  'S',   NULL},                      // s, S, DC3/XOFF
   {ACTION_COMMAND,                                  'C',   NULL},                      // c, C, ETX
   {ACTION_COMMAND,                                  'E',   NULL},                      // e, E, ENQ
-  {ACTION_NONE,                                     0,     NULL},                      // 3, #
+  {ACTION_COMMAND,                                  '#',   NULL},                      // 3, #
   {ACTION_COMMAND,                                  'D',   NULL},                      // d, D, EOT
   {ACTION_COMMAND,                                  'B',   NULL},                      // b, B, STX
   {ACTION_COMMAND,                                  'V',   NULL},                      // v, V, SYN
   {ACTION_COMMAND,                                  'T',   NULL},                      // t, T, DC4
   {ACTION_COMMAND,                                  'R',   NULL},                      // r, R, DC2
-  {ACTION_NONE,                                     0,     NULL},                      // 4, $
-  {ACTION_NONE,                                     0,     NULL},                      // 5, %
+  {ACTION_COMMAND,                                  '$',   NULL},                      // 4, $
+  {ACTION_COMMAND,                                  '%',   NULL},                      // 5, %
   {ACTION_COMMAND,                                  'F',   NULL},                      // f, F, ACK
   {ACTION_COMMAND,                                  'G',   NULL},                      // g, G, BEL
   {ACTION_COMMAND,                                  'N',   NULL},                      // n, N, SO
   {ACTION_COMMAND,                                  'M',   NULL},                      // m, M, CR
   {ACTION_COMMAND,                                  'Y',   NULL},                      // y, Y, EM
   {ACTION_COMMAND,                                  'U',   NULL},                      // u, U, NAK
-  {ACTION_NONE,                                     0,     NULL},                      // 7, &
-  {ACTION_NONE,                                     0,     NULL},                      // 6, ^, RS
+  {ACTION_COMMAND,                                  '&',   NULL},                      // 7, &
+  {ACTION_COMMAND,                                  '^',   NULL},                      // 6, ^, RS
   {ACTION_COMMAND,                                  'J',   NULL},                      // j, J, LF
   {ACTION_COMMAND,                                  'H',   NULL},                      // h, H, BS
-  {ACTION_NONE,                                     0,     NULL},                      // ,, <
-  {ACTION_NONE,                                     'J',   NULL},                      // ], }, GS
+  {ACTION_COMMAND,                                  '<',   NULL},                      // ,, <
+  {ACTION_COMMAND,                                  '}',   NULL},                      // ], }, GS
   {ACTION_COMMAND,                                  'I',   NULL},                      // i, I, TAB
-  {ACTION_NONE,                                     0,     NULL},                      // 8, *
-  {ACTION_NONE,                                     0,     NULL},                      // =, +
+  {ACTION_COMMAND,                                  '*',   NULL},                      // 8, *
+  {ACTION_COMMAND,                                  '+',   NULL},                      // =, +
   {ACTION_COMMAND,                                  'K',   NULL},                      // k, K, VT
-  {ACTION_NONE,                                     0,     NULL},                      // ., >
+  {ACTION_COMMAND,                                  '>',   NULL},                      // ., >
   {ACTION_COMMAND,                                  'O',   NULL},                      // o, O, SI
-  {ACTION_NONE,                                     0,     NULL},                      // 9, (
+  {ACTION_COMMAND,                                  '(',   NULL},                      // 9, (
   {ACTION_COMMAND,                                  'L',   NULL},                      // l, L, FF
-  {ACTION_NONE,                                     0,     NULL},                      // /, ?
-  {ACTION_NONE,                                     0,     NULL},                      // [, {, ESC
+  {ACTION_COMMAND,                                  '?',   NULL},                      // /, ?
+  {ACTION_COMMAND,                                  '{',   NULL},                      // [, {, ESC
   {ACTION_COMMAND,                                  'P',   NULL},                      // p, P, DLE
-  {ACTION_NONE,                                     0,     NULL},                      // 0, )
-  {ACTION_NONE,                                     0,     NULL},                      // -, _, US
-  {ACTION_NONE,                                     0,     NULL},                      // ;, :
-  {ACTION_NONE,                                     0,     NULL},                      // ', "
+  {ACTION_COMMAND,                                  ')',   NULL},                      // 0, )
+  {ACTION_COMMAND,                                  '_',   NULL},                      // -, _, US
+  {ACTION_COMMAND,                                  ':',   NULL},                      // ;, :
+  {ACTION_COMMAND,                                  '"',   NULL},                      // ', "
   {ACTION_NONE,                                     0,     NULL},                      // <left arrow>
   {ACTION_NONE,                                     0,     NULL},                      // <up arrow>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
@@ -5817,7 +5820,7 @@ const struct key_action ASCII_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // c, C, ETX
   {ACTION_NONE,                                     0,     NULL},                      // e, E, ENQ
   {ACTION_NONE,                                     0,     NULL},                      // 3, #
-  {ACTION_NONE,                                     0,     NULL},                      // d, D, EOT
+  {ACTION_COMMAND,                                  0x04,  NULL},                      // d, D, EOT
   {ACTION_NONE,                                     0,     NULL},                      // b, B, STX
   {ACTION_NONE,                                     0,     NULL},                      // v, V, SYN
   {ACTION_NONE,                                     0,     NULL},                      // t, T, DC4
@@ -6090,17 +6093,17 @@ const struct key_action FUTURE_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // <right arrow>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
-  {ACTION_NONE,                                     0,     NULL},                      // \, |
+  {ACTION_COMMAND,                                  '\\',  NULL},                      // \, |
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <setup>
   {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // <down arrow>
-  {ACTION_COMMAND,                                  'Z',   NULL},                      // z, Z, SUB
-  {ACTION_COMMAND,                                  'Q',   NULL},                      // q, Q, DC1/XON
+  {ACTION_COMMAND,                                  'z',   NULL},                      // z, Z, SUB
+  {ACTION_COMMAND,                                  'q',   NULL},                      // q, Q, DC1/XON
   {ACTION_COMMAND,                                  '1',   NULL},                      // 1, !
-  {ACTION_NONE,                                     0,     NULL},                      // `, ~
-  {ACTION_COMMAND,                                  'A',   NULL},                      // a, A, SOH
-  {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_COMMAND,                                  '`',   NULL},                      // `, ~
+  {ACTION_COMMAND,                                  'a',   NULL},                      // a, A, SOH
+  {ACTION_COMMAND,                                  ' ',   NULL},                      // <space>
   {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
@@ -6109,54 +6112,54 @@ const struct key_action FUTURE_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <tab clear>
   {ACTION_NONE,                                     0,     NULL},                      // <control>
-  {ACTION_COMMAND,                                  'X',   NULL},                      // x, X, CAN
-  {ACTION_COMMAND,                                  'W',   NULL},                      // w, W, ETB
+  {ACTION_COMMAND,                                  'x',   NULL},                      // x, X, CAN
+  {ACTION_COMMAND,                                  'w',   NULL},                      // w, W, ETB
   {ACTION_COMMAND,                                  '2',   NULL},                      // 2, @, NUL
-  {ACTION_COMMAND,                                  'S',   NULL},                      // s, S, DC3/XOFF
-  {ACTION_COMMAND,                                  'C',   NULL},                      // c, C, ETX
-  {ACTION_COMMAND,                                  'E',   NULL},                      // e, E, ENQ
+  {ACTION_COMMAND,                                  's',   NULL},                      // s, S, DC3/XOFF
+  {ACTION_COMMAND,                                  'c',   NULL},                      // c, C, ETX
+  {ACTION_COMMAND,                                  'e',   NULL},                      // e, E, ENQ
   {ACTION_COMMAND,                                  '3',   NULL},                      // 3, #
-  {ACTION_COMMAND,                                  'D',   NULL},                      // d, D, EOT
-  {ACTION_COMMAND,                                  'B',   NULL},                      // b, B, STX
-  {ACTION_COMMAND,                                  'V',   NULL},                      // v, V, SYN
-  {ACTION_COMMAND,                                  'T',   NULL},                      // t, T, DC4
-  {ACTION_COMMAND,                                  'R',   NULL},                      // r, R, DC2
+  {ACTION_COMMAND,                                  'd',   NULL},                      // d, D, EOT
+  {ACTION_COMMAND,                                  'b',   NULL},                      // b, B, STX
+  {ACTION_COMMAND,                                  'v',   NULL},                      // v, V, SYN
+  {ACTION_COMMAND,                                  't',   NULL},                      // t, T, DC4
+  {ACTION_COMMAND,                                  'r',   NULL},                      // r, R, DC2
   {ACTION_COMMAND,                                  '4',   NULL},                      // 4, $
   {ACTION_COMMAND,                                  '5',   NULL},                      // 5, %
-  {ACTION_COMMAND,                                  'F',   NULL},                      // f, F, ACK
-  {ACTION_COMMAND,                                  'G',   NULL},                      // g, G, BEL
-  {ACTION_COMMAND,                                  'N',   NULL},                      // n, N, SO
-  {ACTION_COMMAND,                                  'M',   NULL},                      // m, M, CR
-  {ACTION_COMMAND,                                  'Y',   NULL},                      // y, Y, EM
-  {ACTION_COMMAND,                                  'U',   NULL},                      // u, U, NAK
+  {ACTION_COMMAND,                                  'f',   NULL},                      // f, F, ACK
+  {ACTION_COMMAND,                                  'g',   NULL},                      // g, G, BEL
+  {ACTION_COMMAND,                                  'n',   NULL},                      // n, N, SO
+  {ACTION_COMMAND,                                  'm',   NULL},                      // m, M, CR
+  {ACTION_COMMAND,                                  'y',   NULL},                      // y, Y, EM
+  {ACTION_COMMAND,                                  'u',   NULL},                      // u, U, NAK
   {ACTION_COMMAND,                                  '7',   NULL},                      // 7, &
   {ACTION_COMMAND,                                  '6',   NULL},                      // 6, ^, RS
-  {ACTION_COMMAND,                                  'J',   NULL},                      // j, J, LF
-  {ACTION_COMMAND,                                  'H',   NULL},                      // h, H, BS
-  {ACTION_NONE,                                     0,     NULL},                      // ,, <
-  {ACTION_NONE,                                     'J',   NULL},                      // ], }, GS
-  {ACTION_COMMAND,                                  'I',   NULL},                      // i, I, TAB
+  {ACTION_COMMAND,                                  'j',   NULL},                      // j, J, LF
+  {ACTION_COMMAND,                                  'h',   NULL},                      // h, H, BS
+  {ACTION_COMMAND,                                  ',',   NULL},                      // ,, <
+  {ACTION_COMMAND,                                  ']',   NULL},                      // ], }, GS
+  {ACTION_COMMAND,                                  'i',   NULL},                      // i, I, TAB
   {ACTION_COMMAND,                                  '8',   NULL},                      // 8, *
-  {ACTION_NONE,                                     0,     NULL},                      // =, +
-  {ACTION_COMMAND,                                  'K',   NULL},                      // k, K, VT
-  {ACTION_NONE,                                     0,     NULL},                      // ., >
-  {ACTION_COMMAND,                                  'O',   NULL},                      // o, O, SI
+  {ACTION_COMMAND,                                  '=',   NULL},                      // =, +
+  {ACTION_COMMAND,                                  'k',   NULL},                      // k, K, VT
+  {ACTION_COMMAND,                                  '.',   NULL},                      // ., >
+  {ACTION_COMMAND,                                  'o',   NULL},                      // o, O, SI
   {ACTION_COMMAND,                                  '9',   NULL},                      // 9, (
-  {ACTION_COMMAND,                                  'L',   NULL},                      // l, L, FF
-  {ACTION_NONE,                                     0,     NULL},                      // /, ?
-  {ACTION_NONE,                                     0,     NULL},                      // [, {, ESC
-  {ACTION_COMMAND,                                  'P',   NULL},                      // p, P, DLE
+  {ACTION_COMMAND,                                  'l',   NULL},                      // l, L, FF
+  {ACTION_COMMAND,                                  '/',   NULL},                      // /, ?
+  {ACTION_COMMAND,                                  '[',   NULL},                      // [, {, ESC
+  {ACTION_COMMAND,                                  'p',   NULL},                      // p, P, DLE
   {ACTION_COMMAND,                                  '0',   NULL},                      // 0, )
-  {ACTION_NONE,                                     0,     NULL},                      // -, _, US
-  {ACTION_NONE,                                     0,     NULL},                      // ;, :
-  {ACTION_NONE,                                     0,     NULL},                      // ', "
+  {ACTION_COMMAND,                                  '-',   NULL},                      // -, _, US
+  {ACTION_COMMAND,                                  ';',   NULL},                      // ;, :
+  {ACTION_COMMAND,                                  '\'',  NULL},                      // ', "
   {ACTION_NONE,                                     0,     NULL},                      // <left arrow>
   {ACTION_NONE,                                     0,     NULL},                      // <up arrow>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <backspace>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
-  {ACTION_NONE,                                     0,     NULL},                      // <return>
+  {ACTION_COMMAND,                                  0x0d,  NULL},                      // <return>
   {ACTION_NONE,                                     0,     NULL},                      // <delete>
   {ACTION_NONE,                                     0,     NULL},                      // <shift lock>
   {ACTION_NONE,                                     0,     NULL},                      // <right margin>
@@ -6171,17 +6174,17 @@ const struct key_action FUTURE_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // <right arrow>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
-  {ACTION_NONE,                                     0,     NULL},                      // \, |
+  {ACTION_COMMAND,                                  '|',   NULL},                      // \, |
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <setup>
   {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // <down arrow>
   {ACTION_COMMAND,                                  'Z',   NULL},                      // z, Z, SUB
   {ACTION_COMMAND,                                  'Q',   NULL},                      // q, Q, DC1/XON
-  {ACTION_NONE,                                     0,     NULL},                      // 1, !
-  {ACTION_NONE,                                     0,     NULL},                      // `, ~
+  {ACTION_COMMAND,                                  '!',   NULL},                      // 1, !
+  {ACTION_COMMAND,                                  '~',   NULL},                      // `, ~
   {ACTION_COMMAND,                                  'A',   NULL},                      // a, A, SOH
-  {ACTION_NONE,                                     0,     NULL},                      // <space>
+  {ACTION_COMMAND,                                  ' ',   NULL},                      // <space>
   {ACTION_NONE,                                     0,     NULL},                      //
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <left margin>
@@ -6192,52 +6195,52 @@ const struct key_action FUTURE_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // <control>
   {ACTION_COMMAND,                                  'X',   NULL},                      // x, X, CAN
   {ACTION_COMMAND,                                  'W',   NULL},                      // w, W, ETB
-  {ACTION_NONE,                                     0,     NULL},                      // 2, @, NUL
+  {ACTION_COMMAND,                                  '@',   NULL},                      // 2, @, NUL
   {ACTION_COMMAND,                                  'S',   NULL},                      // s, S, DC3/XOFF
   {ACTION_COMMAND,                                  'C',   NULL},                      // c, C, ETX
   {ACTION_COMMAND,                                  'E',   NULL},                      // e, E, ENQ
-  {ACTION_NONE,                                     0,     NULL},                      // 3, #
+  {ACTION_COMMAND,                                  '#',   NULL},                      // 3, #
   {ACTION_COMMAND,                                  'D',   NULL},                      // d, D, EOT
   {ACTION_COMMAND,                                  'B',   NULL},                      // b, B, STX
   {ACTION_COMMAND,                                  'V',   NULL},                      // v, V, SYN
   {ACTION_COMMAND,                                  'T',   NULL},                      // t, T, DC4
   {ACTION_COMMAND,                                  'R',   NULL},                      // r, R, DC2
-  {ACTION_NONE,                                     0,     NULL},                      // 4, $
-  {ACTION_NONE,                                     0,     NULL},                      // 5, %
+  {ACTION_COMMAND,                                  '$',   NULL},                      // 4, $
+  {ACTION_COMMAND,                                  '%',   NULL},                      // 5, %
   {ACTION_COMMAND,                                  'F',   NULL},                      // f, F, ACK
   {ACTION_COMMAND,                                  'G',   NULL},                      // g, G, BEL
   {ACTION_COMMAND,                                  'N',   NULL},                      // n, N, SO
   {ACTION_COMMAND,                                  'M',   NULL},                      // m, M, CR
   {ACTION_COMMAND,                                  'Y',   NULL},                      // y, Y, EM
   {ACTION_COMMAND,                                  'U',   NULL},                      // u, U, NAK
-  {ACTION_NONE,                                     0,     NULL},                      // 7, &
-  {ACTION_NONE,                                     0,     NULL},                      // 6, ^, RS
+  {ACTION_COMMAND,                                  '&',   NULL},                      // 7, &
+  {ACTION_COMMAND,                                  '^',   NULL},                      // 6, ^, RS
   {ACTION_COMMAND,                                  'J',   NULL},                      // j, J, LF
   {ACTION_COMMAND,                                  'H',   NULL},                      // h, H, BS
-  {ACTION_NONE,                                     0,     NULL},                      // ,, <
-  {ACTION_NONE,                                     'J',   NULL},                      // ], }, GS
+  {ACTION_COMMAND,                                  '<',   NULL},                      // ,, <
+  {ACTION_COMMAND,                                  '}',   NULL},                      // ], }, GS
   {ACTION_COMMAND,                                  'I',   NULL},                      // i, I, TAB
-  {ACTION_NONE,                                     0,     NULL},                      // 8, *
-  {ACTION_NONE,                                     0,     NULL},                      // =, +
+  {ACTION_COMMAND,                                  '*',   NULL},                      // 8, *
+  {ACTION_COMMAND,                                  '+',   NULL},                      // =, +
   {ACTION_COMMAND,                                  'K',   NULL},                      // k, K, VT
-  {ACTION_NONE,                                     0,     NULL},                      // ., >
+  {ACTION_COMMAND,                                  '>',   NULL},                      // ., >
   {ACTION_COMMAND,                                  'O',   NULL},                      // o, O, SI
-  {ACTION_NONE,                                     0,     NULL},                      // 9, (
+  {ACTION_COMMAND,                                  '(',   NULL},                      // 9, (
   {ACTION_COMMAND,                                  'L',   NULL},                      // l, L, FF
-  {ACTION_NONE,                                     0,     NULL},                      // /, ?
-  {ACTION_NONE,                                     0,     NULL},                      // [, {, ESC
+  {ACTION_COMMAND,                                  '?',   NULL},                      // /, ?
+  {ACTION_COMMAND,                                  '{',   NULL},                      // [, {, ESC
   {ACTION_COMMAND,                                  'P',   NULL},                      // p, P, DLE
-  {ACTION_NONE,                                     0,     NULL},                      // 0, )
-  {ACTION_NONE,                                     0,     NULL},                      // -, _, US
-  {ACTION_NONE,                                     0,     NULL},                      // ;, :
-  {ACTION_NONE,                                     0,     NULL},                      // ', "
+  {ACTION_COMMAND,                                  ')',   NULL},                      // 0, )
+  {ACTION_COMMAND,                                  '_',   NULL},                      // -, _, US
+  {ACTION_COMMAND,                                  ':',   NULL},                      // ;, :
+  {ACTION_COMMAND,                                  '"',   NULL},                      // ', "
   {ACTION_NONE,                                     0,     NULL},                      // <left arrow>
   {ACTION_NONE,                                     0,     NULL},                      // <up arrow>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
   {ACTION_NONE,                                     0,     NULL},                      // <backspace>
   {ACTION_NONE,                                     0,     NULL},                      // *** not available on WW1000
-  {ACTION_NONE,                                     0,     NULL},                      // <return>
+  {ACTION_COMMAND,                                  0x0d,  NULL},                      // <return>
   {ACTION_NONE,                                     0,     NULL},                      // <delete>
   {ACTION_NONE,                                     0,     NULL},                      // <shift lock>
   {ACTION_NONE,                                     0,     NULL},                      // <right margin>
@@ -6278,7 +6281,7 @@ const struct key_action FUTURE_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
   {ACTION_NONE,                                     0,     NULL},                      // c, C, ETX
   {ACTION_NONE,                                     0,     NULL},                      // e, E, ENQ
   {ACTION_NONE,                                     0,     NULL},                      // 3, #
-  {ACTION_NONE,                                     0,     NULL},                      // d, D, EOT
+  {ACTION_COMMAND,                                  0x04,  NULL},                      // d, D, EOT
   {ACTION_NONE,                                     0,     NULL},                      // b, B, STX
   {ACTION_NONE,                                     0,     NULL},                      // v, V, SYN
   {ACTION_NONE,                                     0,     NULL},                      // t, T, DC4
@@ -6675,7 +6678,7 @@ void loop () {
       }
       if (Serial_write (c) != 1) break;
       if (++sb_read >= SIZE_SEND_BUFFER) sb_read = 0;
-      Increment_counter (&sb_count, -1);
+      Update_counter (&sb_count, -1);
       sent = TRUE;
     }
     if (sent) Serial_send_now ();
@@ -6685,7 +6688,7 @@ void loop () {
   while (tb_count > 0) {
     if (!Print_string ((const struct print_info *)(transfer_buffer[tb_read]))) break;
     if (++tb_read >= SIZE_TRANSFER_BUFFER) tb_read = 0;
-    Increment_counter (&tb_count, -1);
+    Update_counter (&tb_count, -1);
   }
 
   // For IBM 1620 Jr. - Send ack if requested and previous command's print output has been processed.
@@ -6894,12 +6897,12 @@ void loop () {
         char cmd = Read_setup_command ();
         if (cmd == 's') {
           Update_IBM_settings ();
-        } else if (cmd == 'd') {
-          Developer_functions ();
         } else if (cmd == 'e') {
           Print_errors_warnings ();
         } else if (cmd == 'c') {
           Print_IBM_character_set ();
+        } else if (cmd == 'd') {
+          Developer_functions ();
         } else /* cmd == 'q' */ {
           break;
         }
@@ -6932,12 +6935,12 @@ void loop () {
         char cmd = Read_setup_command ();
         if (cmd == 's') {
           Update_ASCII_settings ();
-        } else if (cmd == 'd') {
-          Developer_functions ();
         } else if (cmd == 'e') {
           Print_errors_warnings ();
         } else if (cmd == 'c') {
           Print_ASCII_character_set ();
+        } else if (cmd == 'd') {
+          Developer_functions ();
         } else /* cmd == 'q' */ {
           break;
         }
@@ -7791,7 +7794,7 @@ inline boolean Send_character (char chr) {
   if (sb_count < SIZE_SEND_BUFFER) {
     send_buffer[sb_write] = chr;
     if (++sb_write >= SIZE_SEND_BUFFER) sb_write = 0;
-    Increment_counter (&sb_count, 1);
+    Update_counter (&sb_count, 1);
   } else {  // Character doesn't fit in the send buffer.
     Report_error (ERROR_SB_FULL);
     return FALSE;
@@ -7813,7 +7816,7 @@ inline boolean Transfer_print_string (const struct print_info *str) {
   if (tb_count < SIZE_TRANSFER_BUFFER) {
     transfer_buffer[tb_write] = str;
     if (++tb_write >= SIZE_TRANSFER_BUFFER) tb_write = 0;
-    Increment_counter (&tb_count, 1);
+    Update_counter (&tb_count, 1);
     return TRUE;
   } else {  // Print string doesn't fit in transfer buffer.
     Report_error (ERROR_TB_FULL);
@@ -7989,7 +7992,7 @@ boolean Print_string (const struct print_info *str) {
 
   // Release copied string for printing.
   pb_write = pbw;
-  Increment_counter (&pb_count, inc);
+  Update_counter (&pb_count, inc);
   print_buffer[start] = WW_SKIP;
 
   // Update current print position, tab stops, and margins.
@@ -8066,14 +8069,14 @@ inline byte Test_print (int column) {
     if (!Test_printing_caught_up ()) return ROW_OUT_NO_PIN;
     if (++pb_read >= SIZE_PRINT_BUFFER) pb_read = 0;
     pchr = print_buffer[pb_read];
-    Increment_counter (&pb_count, -1);
+    Update_counter (&pb_count, -1);
   }
 
   // Skip any skip print codes.
   while (pchr == WW_SKIP) {
     if (++pb_read >= SIZE_PRINT_BUFFER) pb_read = 0;
     pchr = print_buffer[pb_read];
-    Increment_counter (&pb_count, -1);
+    Update_counter (&pb_count, -1);
   }
 
   // If next print code is in this column, assert associated row line.
@@ -8084,7 +8087,7 @@ inline byte Test_print (int column) {
       digitalWriteFast (ROW_ENABLE_PIN, LOW);
     }
     if (++pb_read >= SIZE_PRINT_BUFFER) pb_read = 0;
-    Increment_counter (&pb_count, -1);
+    Update_counter (&pb_count, -1);
     return pin;
   }
 
@@ -8110,7 +8113,7 @@ void Take_action (int key) {
     if (cb_count < SIZE_COMMAND_BUFFER) {
       command_buffer[cb_write] = (*key_actions)[key].send;
       if (++cb_write >= SIZE_COMMAND_BUFFER) cb_write = 0;
-      Increment_counter (&cb_count, 1);
+      Update_counter (&cb_count, 1);
     } else {  // Character doesn't fit in the command buffer.
       Report_error (ERROR_CB_FULL);
     }
@@ -8177,7 +8180,7 @@ void Take_action (int key) {
         if (sb_count < SIZE_SEND_BUFFER) {
           send_buffer[sb_write] = CHAR_ASCII_CR;
           if (++sb_write >= SIZE_SEND_BUFFER) sb_write = 0;
-          Increment_counter (&sb_count, 1);
+          Update_counter (&sb_count, 1);
         } else {  // Character doesn't fit in send buffer.
           Report_error (ERROR_SB_FULL);
         }
@@ -8185,10 +8188,10 @@ void Take_action (int key) {
         if (sb_count < (SIZE_SEND_BUFFER - 1)) {
           send_buffer[sb_write] = CHAR_ASCII_CR;
           if (++sb_write >= SIZE_SEND_BUFFER) sb_write = 0;
-          Increment_counter (&sb_count, 1);
+          Update_counter (&sb_count, 1);
           send_buffer[sb_write] = CHAR_ASCII_LF;
           if (++sb_write >= SIZE_SEND_BUFFER) sb_write = 0;
-          Increment_counter (&sb_count, 1);
+          Update_counter (&sb_count, 1);
         } else {  // Character doesn't fit in send buffer.
           Report_error (ERROR_SB_FULL);
         }
@@ -8196,7 +8199,7 @@ void Take_action (int key) {
         if (sb_count < SIZE_SEND_BUFFER) {
           send_buffer[sb_write] = CHAR_ASCII_LF;
           if (++sb_write >= SIZE_SEND_BUFFER) sb_write = 0;
-          Increment_counter (&sb_count, 1);
+          Update_counter (&sb_count, 1);
         } else {  // Character doesn't fit in send buffer.
           Report_error (ERROR_SB_FULL);
         }
@@ -8204,10 +8207,10 @@ void Take_action (int key) {
         if (sb_count < (SIZE_SEND_BUFFER - 1)) {
           send_buffer[sb_write] = CHAR_ASCII_LF;
           if (++sb_write >= SIZE_SEND_BUFFER) sb_write = 0;
-          Increment_counter (&sb_count, 1);
+          Update_counter (&sb_count, 1);
           send_buffer[sb_write] = CHAR_ASCII_CR;
           if (++sb_write >= SIZE_SEND_BUFFER) sb_write = 0;
-          Increment_counter (&sb_count, 1);
+          Update_counter (&sb_count, 1);
         } else {  // Character doesn't fit in send buffer.
           Report_error (ERROR_SB_FULL);
         }
@@ -8238,8 +8241,12 @@ void Take_action (int key) {
   }
 }
 
-// Atomically increment a counter.
-__attribute__((noinline)) void Increment_counter (volatile int *counter, int increment) {
+// Safely increment/decrement a shared counter without disabling interrupts.
+// Note:  The Teensy 3.5's Cortex-M4 processor implements the ARMv7-M architecture which supports synchronization
+//        primitives.  As long as all updates to the shared counters in the main code and ISRs call this routine, the
+//        counters will be correct.  For information on the LDREX/STREX instructions, refer to sections 2.2.7 and 3.4.8
+//        in: http://infocenter.arm.com/help/topic/com.arm.doc.dui0553b/DUI0553.pdf
+__attribute__((noinline)) void Update_counter (volatile int *counter, int increment) {
   int value;
   int result;
 
@@ -8336,7 +8343,7 @@ char Read_setup_command () {
   Space_to_column (COLUMN_COMMAND);
 
   // Read a command character.
-  char cmd = Read_setup_character_from_set ("sSeEcCdDqQ\r");
+  char cmd = Read_setup_character_from_set ("sSeEcC\004qQ\r");
 
   // Return setup command.
   if ((cmd == 's') || (cmd == 'S')) {
@@ -8348,7 +8355,7 @@ char Read_setup_command () {
   } else if ((cmd == 'c') || (cmd == 'C')) {
     Print_characters ("character set\r");
     return 'c';
-  } else if ((cmd == 'd') || (cmd == 'D')) {
+  } else if (cmd == '\004') {
     Print_characters ("developer\r");
     return 'd';
   } else /* (cmd == 'q') || (cmd == 'Q') || (cmd == '\r') */ {
@@ -9167,7 +9174,7 @@ byte Read_setup_character () {
   while (cb_count == 0) delay (1);
   byte chr = command_buffer[cb_read];
   if (++cb_read >= SIZE_COMMAND_BUFFER) cb_read = 0;
-  Increment_counter (&cb_count, -1);
+  Update_counter (&cb_count, -1);
   return chr;
 }
 
@@ -9177,7 +9184,7 @@ byte Read_setup_character_from_set (const char *charset) {
     while (cb_count == 0) delay (1);
     byte chr = command_buffer[cb_read];
     if (++cb_read >= SIZE_COMMAND_BUFFER) cb_read = 0;
-    Increment_counter (&cb_count, -1);
+    Update_counter (&cb_count, -1);
     if (strchr (charset, chr)) {
       return chr;
     } else {
