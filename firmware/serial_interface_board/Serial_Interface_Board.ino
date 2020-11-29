@@ -14,13 +14,13 @@
 //                      WheelWriter USB Interface Board, v1.7, May 2019.  Retired.
 //                      WheelWriter Serial Interface Board, v2.0, July 2019.
 //
-//  Build environment:  Arduino IDE 1.8.12 (https://www.arduino.cc/en/main/software).
-//                      Teensyduino 1.51 (https://www.pjrc.com/teensy/td_download.html).
+//  Build environment:  Arduino IDE 1.8.13 (https://www.arduino.cc/en/main/software).
+//                      Teensyduino 1.53 (https://www.pjrc.com/teensy/td_download.html).
 //                      SlowSoftSerial library (https://github.com/MustBeArt/SlowSoftSerial).
 //                      Compile options - Teensy 3.5, USB Serial, 120 MHz, Fastest with LTO.
 //
-//  Memory:             88892 bytes (16%) of program storage space.
-//                      108444 bytes (41%) of dynamic memory for global variables.
+//  Memory:             81172 bytes (15%) of program storage space.
+//                      109188 bytes (41%) of dynamic memory for global variables.
 //
 //  Documentation:      IBM 1620 Jr. Console Typewriter Protocol, version 1.10, 5/24/2019.
 //                      IBM 1620 Jr. Console Typewriter Test Program, version 1.10, 5/24/2019.
@@ -41,42 +41,58 @@
 //                      You should have received a copy of the GNU General Public License along with this program. If
 //                      not, see <http://www.gnu.org/licenses/> 
 //
-//  Revision History:   5R1  5/10/2019  Initial release of rewritten firmware.
-//                      5R2  5/25/2019  Corrections to standalone typewriter emulation.
-//                                      Removed the printing of the emulation banners.
-//                                      Replaced ASCII print characters \, `, <, >, ^, and ~ with period graphics.
-//                                      Added more error and warning checking.
-//                                      Removed IBM 1620 Jr. initialize command code to be replaced with setup function.
-//                                      Added ASCII Terminal options - auto LF, width.
-//                                      Added IBM 1620 Jr. options - slash zero, bold.
-//                      5R3  6/10/2019  Added IBM 1620 Jr. & ASCII Terminal software flow control.
-//                                      Replaced ASCII print characters { and } with period graphics.
-//                                      Added interactive setup functions for IBM 1620 Jr. & ASCII Terminal.
-//                                      Added settings for RS-232 serial, but not support for it yet.
-//                      5R4  8/30/2019  Renamed firmware & variables to reflect expanded capability.
-//                                      Added support for v2.0 Serial Interface Board.
-//                                      Added support for RS-232 serial.
-//                                      Added margin, tab, uppercase, and emulation settings to EEPROM.
-//                                      Added column offset setting to support column 1 period graphics.
-//                                      Updated period graphic characters to correctly print in column 1.
-//                                      Added reset all settings to factory defaults operation.
-//                                      Expanded end-of-line handling on input and output.
-//                                      Added option to ignore escape sequences.
-//                                      Made MarRel, LMar, RMar, TSet, TClr control functions only.
-//                                      Disabled unusable baud rates.
-//                                      Cleaned up the printing of some special ASCII characters.
-//                                      Added developer function to calibrate print string timings.
-//                      5R5  11/8/2019  Added support for semi-automatic paper loading.
-//                                      Increased time for ISR delay to deal with overlapping column scans.
-//                                      Adjusted timing of unshifted, shifted, and code characters.
-//                      5R6 11/12/2019  Corrected set of available baud rates.
-//                      5R7 12/29/2019  Removed some unneeded timing dependencies.
-//                      5R8  3/11/2020  Adopted the SlowSoftSerial library to allow slow baud rates.
-//                                      Fixed corner cases of margin and tab settings.
-//                                      Added a beep when an invalid character is typed in setup mode.
-//                                      Refactored and cleaned up some code.
-//                      5R9  3/21/2020  Expanded the set of invalid setup characters that trigger a beep.
-//                                      Improved global counter synchronization comments.
+//  Revision History:   5R1   5/10/2019  Initial release of rewritten firmware.
+//                      5R2   5/25/2019  Corrections to standalone typewriter emulation.
+//                                       Removed the printing of the emulation banners.
+//                                       Replaced ASCII print characters \, `, <, >, ^, and ~ with period graphics.
+//                                       Added more error and warning checking.
+//                                       Removed IBM 1620 Jr. initialize command code to be replaced with setup
+//                                           function.
+//                                       Added ASCII Terminal options - auto LF, width.
+//                                       Added IBM 1620 Jr. options - slash zero, bold.
+//                      5R3   6/10/2019  Added IBM 1620 Jr. & ASCII Terminal software flow control.
+//                                       Replaced ASCII print characters { and } with period graphics.
+//                                       Added interactive setup functions for IBM 1620 Jr. & ASCII Terminal.
+//                                       Added settings for RS-232 serial, but not support for it yet.
+//                      5R4   8/30/2019  Renamed firmware & variables to reflect expanded capability.
+//                                       Added support for v2.0 Serial Interface Board.
+//                                       Added support for RS-232 serial.
+//                                       Added margin, tab, uppercase, and emulation settings to EEPROM.
+//                                       Added column offset setting to support column 1 period graphics.
+//                                       Updated period graphic characters to correctly print in column 1.
+//                                       Added reset all settings to factory defaults operation.
+//                                       Expanded end-of-line handling on input and output.
+//                                       Added option to ignore escape sequences.
+//                                       Made MarRel, LMar, RMar, TSet, TClr control functions only.
+//                                       Disabled unusable baud rates.
+//                                       Cleaned up the printing of some special ASCII characters.
+//                                       Added developer function to calibrate print string timings.
+//                      5R5   11/8/2019  Added support for semi-automatic paper loading.
+//                                       Increased time for ISR delay to deal with overlapping column scans.
+//                                       Adjusted timing of unshifted, shifted, and code characters.
+//                      5R6  11/12/2019  Corrected set of available baud rates.
+//                      5R7  12/29/2019  Removed some unneeded timing dependencies.
+//                      5R8   3/11/2020  Adopted the SlowSoftSerial library to allow slow baud rates.
+//                                       Fixed corner cases of margin and tab settings.
+//                                       Added a beep when an invalid character is typed in setup mode.
+//                                       Refactored and cleaned up some code.
+//                      5R9   3/21/2020  Expanded the set of invalid setup characters that trigger a beep.
+//                                       Improved global counter synchronization comments.
+//                      5R10 11/27/2020  Corrected RS-232 hardware flow control.
+//                                       Fixed a problem with software flow control.
+//                                       Switched sense of flow_in_on and flow_out_on to be more consistent.
+//                                       Changed name of paper width setting to line length.
+//                                       Changed line offset option to specify number of positions to offset and make it
+//                                           apply to all emulations.
+//                                       Changed reading of line length and line offset settings to use general-purpose
+//                                           integer read.
+//                                       Changed definition and handling of escape sequences setting.
+//                                       Expanded escape sequences to full ISO/IEC 6429 (ECMA-48, ANSI X3.64) and added
+//                                           error for bad escape sequence.
+//                                       Added preliminary support for wide-carriage and 20cps Wheelwriters.
+//                                           Warning:  The 20cps timing isn't calibrated yet.  No characters are lost,
+//                                                     but the firmware drives the print mechanism too fast and there is
+//                                                     lots of beeping.
 //
 //  Future ideas:       1. Support other Wheelwriter models.
 //
@@ -84,12 +100,11 @@
 //                         typewriter settings (Bold, Caps, Center, Word & Continuous Underlining, Language, Line
 //                         Spacings, Right Flush, Decimal Alignment, Indent, Spell Check, and PowerWise), etc.
 //
-//                      3. Implement a subset of ANSI Escape Sequences that make sense for a printing terminal and
-//                         ignore the others.
+//                      3. Implement a subset of ANSI Escape Sequences that make sense for a printing terminal.
 //
 //                      4. Add other terminal emulations such as EBCDIC, APL, DecWriter, etc.
 //
-//                      5. Add a means to use a USB memory stick as a paper tape device to allow the emulation of
+//                      5. Add a means to use USB memory sticks as paper tape devices to allow the emulation of
 //                         terminals such as an ASR-33 and Flexowriter.
 //
 //                      6. Add pagination support for individual sheets of paper or fan-fold paper.
@@ -100,6 +115,7 @@
 //
 //======================================================================================================================
 
+#include <limits.h>
 #include <EEPROM.h>
 #include <SlowSoftSerial.h>
 
@@ -126,9 +142,9 @@
 //                   used (WW_KEY_n_N_Caps, WW_PRINT_n).
 //                *  Enumeration values have a common prefix (ACTION_PRINT, ACTION_SEND, ...).  Macros (#defines) are
 //                   used in lieu of enum data types.
-//                *  Common global variables are all lower case, complete words, and separated by underscores
+//                *  Common global variables are all lowercase, complete words, and separated by underscores
 //                   (print_buffer).
-//                *  Function names are mixed upper / lower case, complete words, separated by underscores, and begin
+//                *  Function names are mixed uppercase / lowercase, complete words, separated by underscores, and begin
 //                   with an upper case letter (Take_action).  The only exceptions are the setup() and loop() functions
 //                   whose names are required by the Arduino executive.
 //                *  If a constant, variable, or function is specific to just one emulation, then it includes either
@@ -577,7 +593,7 @@
 //                      *  The period is horizontally in the center of the character "block".  In order to print in
 //                         micro-columns 1 and 2, the carriage needs to move to the left.  This is not possible when the
 //                         carriage is in the true column 1 position and up against the left stop.  So, the column
-//                         offset setting, which is TRUE by default, relocates all columns one print position to the
+//                         offset setting, which is 1 by default, relocates all columns one print position to the
 //                         right.  The affected period graphic characters need appropriate MarRel operations to move
 //                         into micro-columns 1 and 2.  This allows period graphic characters printed in column "1"
 //                         (physical column 2) to print correctly.  Note that the column marker on the front of the
@@ -648,12 +664,13 @@
 //               *  Battery installed setting (TRUE, FALSE) used by all emulations.  Initial value = FALSE
 //               *  Left margin setting (1 - 164) used by all emulations.  Initial value = 1;
 //               *  Right margin setting (2 - 165) used by all emulations.  Initial value = 80;
-//               *  Tab array[166] setting (TRUE, FALSE) used by all emulations.  Initial value:
+//               *  Tab array[200] setting (TRUE, FALSE) used by all emulations.  Initial value:
 //                                                                                IBM 1620 Jr. = all FALSE,
 //                                                                                ASCII Terminal = TRUE every 8 columns.
+//               *  Column offset setting (0 - 9) used by all emulations.  Initial value = 0 (IBM), 1 (ASCII).
 //               *  Slashed zeroes setting (TRUE, FALSE) of the IBM 1620 Jr. Console Typewriter.  Initial value = TRUE.
-//               *  Print bold input setting (TRUE, FALSE) of the IBM 1620 Jr. Console Typewriter.
-//                  Initial value = FALSE.
+//               *  Print bold input setting (TRUE, FALSE) of the IBM 1620 Jr. Console Typewriter.  Initial value =
+//                  FALSE.
 //               *  Serial setting (USB, RS232) of the ASCII Terminal.  Initial value = USB.
 //               *  Duplex setting (FULL, HALF) of the ASCII Terminal.  Initial value = FULL.
 //               *  Baud setting (50 - 230400) of the ASCII Terminal (RS-232 only).  Initial value = 9600.
@@ -661,16 +678,16 @@
 //               *  Databits, parity, stopbits setting (7O1, 7E1, 8N1, 8O1, 8E1, 8N2, 8O2, 8E2) of the ASCII Terminal
 //                  (RS-232 only).  Initial value = 8N1.
 //               *  Software flow control setting (NONE, XON_XOFF) of the ASCII Terminal.  Initial value = XON_XOFF.
-//               *  Hardware flow control setting (NONE, RTS_CTS, RTR_CTS) of the ASCII Terminal.  Initial value = TRUE.
+//               *  Hardware flow control setting (NONE, RTS_CTS, RTR_CTS) of the ASCII Terminal.  Initial value = NONE.
 //               *  Uppercase only setting (TRUE, FALSE) of the ASCII Terminal.  Initial value = FALSE.
 //               *  Auto return setting (TRUE, FALSE) of the ASCII Terminal.  Initial value = TRUE.
 //               *  Transmit EOL setting (EOL_CR, EOL_CRLF, EOL_LF, EOL_LFCR) of the ASCII TERMINAL.
 //                  Initial value = EOL_CR.
 //               *  Receive EOL setting (EOL_CR, EOL_CRLF, EOL_LF, EOL_LFCR) of the ASCII TERMINAL.
 //                  Initial value = EOL_CRLF.
-//               *  Ignore escape sequences setting (TRUE, FALSE).  Initial value = TRUE.
-//               *  Paper width setting (80 - 165) of the ASCII Terminal.  Initial value = 80.
-//               *  Column offset setting (TRUE, FALSE) of the ASCII Terminal.  Initial value = TRUE.
+//               *  Escape sequences setting (NONE, IGNORE).  Initial value = IGNORE.
+//               *  Line length setting (80 - 165) of the ASCII Terminal.  For wide-carriage Wheelwriters, the range is
+//                  80 - 198.  Initial value = 80.
 //
 //  Tabled logic - This program uses "tabled logic" where much of the program's logic is embedded in decision tables and
 //                 hybrid FSA [Finite State Automata] tables.  For example, rather than have a set of individual status
@@ -707,9 +724,9 @@
 //                     keys.  Power wise mode can always be directly turned off and all tab stops cleared. However, to
 //                     set [or possibly reset] the margins, the firmware returns the carriage, asserts margin release,
 //                     backspaces 20 positions [in case the left margin had been previously moved], and sets the left
-//                     margin.  It then spaces (width - 1) positions to the right [the typewriter never stops at the
+//                     margin.  It then spaces (length - 1) positions to the right [the typewriter never stops at the
 //                     right margin, it only beeps when getting close] and sets the right margin.  It is most likely
-//                     that the margins were already set to 1 and width, but these startup actions will guarantee it.
+//                     that the margins were already set to 1 and length, but these startup actions will guarantee it.
 //                     Other options (like line spacing) are assumed to be in their "cold start" [no batteries, just
 //                     plugged in, and turned on] state.
 //
@@ -781,6 +798,58 @@
 //                 In order to provide baud rates from 50 to 600, the SlowSoftSerial library is used to bit-bang
 //                 the serial data on the same GPIO pins.
 //
+//                 The firmware supports hardware flow control (RTS/CTS and RTR/CTS) as well as software flow control
+//                 (XON/XOFF).  The difference between RTS/CTS and RTR/CTS is the handling of the DE-9 connector’s pin
+//                 #7.  In older RS-232 specifications, pin #7 was RTS [Request To Send] which was used by the DTE to
+//                 request permission to send data to the DCE.  As of the 1991 RS-232-E specification, RTS is assumed
+//                 to always be asserted and pin #7 is now RTR [Ready To Receive] which the DTE uses to signal that it
+//                 is able to receive data from the DCE.  Pin #8 has always been CTS [Clear To Send] used to signal that
+//                 the DTE can send data to the DCE.  Many vendors incorrectly state their interface uses RTS when in
+//                 fact it uses RTR, including the Teensy 3.5 documentation.  With true RTS, Cadetwriter cannot stop
+//                 the computer from overwhelming it with data to print using hardware flow control.
+//
+//                 HW Flow Setting       RTS/RTR (pin 7) DTE -> DCE        CTS (pin 8) DTE <- DCE  
+//                 ------------------------------------------------------------------------------
+//                      none                     enabled                           ignored                 
+//                     rts_cts            enabled if data to send           if enabled, send data   
+//                     rtr_cts        enabled if ready to receive data      if enabled, send data   
+// 
+//  Escape sequences - The ISO/IEC 6429 (ECMA-48, ANSI X3.64) standard defines escape sequences (a series of ASCII
+//                     characters starting with ESCape) which can be sent to a terminal.  Most of these only make sense
+//                     for display screen terminals, but a few could also apply to printing terminals (setting/clearing
+//                     margins & tabs and carriage movement).  A host computer may mistakenly send escape sequences to
+//                     Cadetwriter.  If the escape sequences setting is set to NONE, then the coded characters in
+//                     the sequence itself will be printed.  If the setting is IGNORE, then the entire escape sequence
+//                     will be silently discarded.  The firmware using a Finite-State Machine (FSM) to properly
+//                     recognize all of the standard-defined escape sequences.  The sequences fall into these groups:
+//
+//                     Type      Escape   Opener   Parameters   Intermediates         Final
+//                               (1)      (0-1)    (0-n)        (0-n)                 (1)
+//                     -----------------------------------------------------------------------------------------
+//                     CSI       <esc>    [        0-9:;<=>?    <sp>!"#$%&'()*+,-./   @A-Z[\]^_`a-z{|}~
+//                               (0x1B)   (0x5B)   (0x30-0x3F)  (0x20-0x2F)           (0x40-0x7E)
+//
+//                     Function  <esc>                          <sp>!"#$%&'()*+,-./   0-9:;<=>?@A-Z[\]^_`a-z{|}~
+//                               (0x1B)                         (0x20-0x2F)           (0x30-0x7E)
+//
+//                     String    <esc>    PX]^_    <bs><tab><lf><vt><ff><cr><sp>!"#   <esc> \  -or-  <bel>
+//                                                 $^&'()*+,-./0-9:;<=>?@A-Z[\]^_`
+//                                                 a-z{|}~
+//                               (0x1B)   (0x50)   (0x08-0x0D, 0x20-0x7E)             (0x1B 0x5C) -or- (0x07)
+//                                        (0x58)
+//                                        (0x5D-
+//                                         0x5F)
+//
+//                     Special cases:
+//                     *  NUL (0x00) and DEL (0x7F) are always ignored.
+//                     *  CAN (0x18) and SUB (0x1A) immediately abort the sequence.
+//                     *  All control characters (0x01 - 0x1F) except CAN (0x18), SUB (0x1A), and ESC (0x1B) anywhere,
+//                        except in String bodies, perform their normal action.
+//                     *  P (0x50), X (0x58), ] (0x5D), ^ (0x5E), and _ (0x5F) cannot be used to terminate Function
+//                        sequences unless they contain at least one Intermediate character.
+//                     *  Any ESC (0x1B) after the first, except in Strings, immediately aborts the current sequence and
+//                        starts another one.
+//                     
 //  Board revisions - This firmware automatically supports all revisions of the Serial Interface Board.
 //                    1.6: The first production board.  The basic board has a hardware problem with random characters
 //                         being printed and random carriage movements when new firmware is downloaded and at power on.
@@ -797,7 +866,14 @@
 //                         interfaces.  It also has Hardware support for a 15th keyboard column scan line.  This board
 //                         is identified by BLUE_LED_PIN == LOW.  It requires that the ROW_ENABLE_PIN be set LOW to
 //                         enable fake key presses to be seen by the logic board.
-// 
+//
+//  Wheelwriter models - The Cadetwriter Serial Interface Board and firmware were developed using a Wheelwriter 1000,
+//                       but have been successfully used with other model Wheelwriters, both single-board and dual-board
+//                       varities. To date, no changes to the Serial Interface Board have been needed.  However, the
+//                       location of the board does change depending on the space available in the typewriter.  Minor
+//                       firmware changes are needed when the Wheelwriter has a wide carriage and/or faster print speed.
+//                       These changes are controlled by a set of FEATURE_* defines below.
+//
 //======================================================================================================================
 
 
@@ -808,6 +884,36 @@
 //
 //======================================================================================================================
 
+// Logic values.
+#define TRUE   1  // Boolean true.
+#define FALSE  0  // Boolean false.
+
+//**********************************************************************************************************************
+//
+//  Wheelwriter feature definitions.
+//
+//**********************************************************************************************************************
+
+// Wheelwriter 1000
+#define FEATURE_20CPS           FALSE
+#define FEATURE_WIDE_CARRIAGE   FALSE
+#define FEATURE_VERSION_SUFFIX  ""
+
+// Wheelwriter 1500
+// #define FEATURE_20CPS           TRUE
+// #define FEATURE_WIDE_CARRIAGE   TRUE
+// #define FEATURE_VERSION_SUFFIX  "_1500"
+
+// Wheelwriter 5
+// #define FEATURE_20CPS           TRUE
+// #define FEATURE_WIDE_CARRIAGE   TRUE
+// #define FEATURE_VERSION_SUFFIX  "_5"
+
+// Wheelwriter 30 Series II
+// #define FEATURE_20CPS           TRUE
+// #define FEATURE_WIDE_CARRIAGE   TRUE
+// #define FEATURE_VERSION_SUFFIX  "_30II"
+
 //**********************************************************************************************************************
 //
 //  Global definitions.
@@ -815,8 +921,10 @@
 //**********************************************************************************************************************
 
 // Firmware version values.
-#define VERSION       59
-#define VERSION_TEXT  "5R9"
+#define VERSION       60
+#define VERSION_TEXT  "5R10" FEATURE_VERSION_SUFFIX
+
+#define VERSION_ESCAPEOFFSET_CHANGED  60  // Version when escape sequences and line offset changed.
 
 // Physical I/O port pins.
 #define PTC_5   13  // Embedded Teensy 3.5 board orange LED.
@@ -1210,12 +1318,29 @@
 #define SPACING_CLRALL    10  // No horizontal movement, clear all tabs.
 
 // Print string timing values (in usec).
-#define TIME_CHARACTER    65000  // Time of one average print character.
-#define TIME_HMOVEMENT   125000  // Time of one horizontal movement character.
-#define TIME_VMOVEMENT   125000  // Time of one vertical movement character.
-#define TIME_RETURN      750000  // Time of one full carriage return.
-#define TIME_LOADPAPER  3000000  // Time of one load paper.
-#define TIME_ADJUST       10000  // Time adjustment for special cases.
+#if FEATURE_20CPS
+  #define TIME_CHARACTER    52000  // Time of one average print character.
+  #define TIME_HMOVEMENT   100000  // Time of one horizontal movement character.
+  #define TIME_VMOVEMENT   100000  // Time of one vertical movement character.
+  #if FEATURE_WIDE_CARRIAGE
+    #define TIME_RETURN    720000  // Time of one full carriage return.
+  #else
+    #define TIME_RETURN    600000  // Time of one full carriage return.
+  #endif
+  #define TIME_LOADPAPER  2400000  // Time of one load paper.
+  #define TIME_ADJUST        8000  // Time adjustment for special cases.
+#else
+  #define TIME_CHARACTER    65000  // Time of one average print character.
+  #define TIME_HMOVEMENT   125000  // Time of one horizontal movement character.
+  #define TIME_VMOVEMENT   125000  // Time of one vertical movement character.
+  #if FEATURE_WIDE_CARRIAGE
+    #define TIME_RETURN    900000  // Time of one full carriage return.
+  #else
+    #define TIME_RETURN    750000  // Time of one full carriage return.
+  #endif
+  #define TIME_LOADPAPER  3000000  // Time of one load paper.
+  #define TIME_ADJUST       10000  // Time adjustment for special cases.
+#endif
 
 #define POSITIVE(v)  ((v) >= 0 ? (v) : 0)
 
@@ -1249,10 +1374,6 @@
 #define COLUMN_QUESTION  49  // Column to space to for question answers so prompts can be read.
 #define COLUMN_FUNCTION  69  // Column to space to for function response so prompt can be read.
 
-// Logic values.
-#define TRUE   1  // Boolean true.
-#define FALSE  0  // Boolean false.
-
 // Size of data arrays.
 #define SIZE_COMMAND_BUFFER     100  // Size of command buffer, in characters.
 #define SIZE_RECEIVE_BUFFER    1000  // Size of serial receive buffer, in characters.
@@ -1260,11 +1381,55 @@
 #define SIZE_TRANSFER_BUFFER    100  // Size of ISR -> main transfer buffer, in print characters.
 #define SIZE_PRINT_BUFFER    100000  // Size of print buffer, in print codes.
 
+// RTS values.
+#define RTS_TIMEOUT_DELAY  500  // Timeout delay (in msec) before turning off RTS.
+
 // Buffer flow control thresholds.
-#define LOWER_THRESHOLD_RECEIVE_BUFFER     50  // Flow control lower threshold of serial receive buffer, in characters.
-#define UPPER_THRESHOLD_RECEIVE_BUFFER    750  // Flow control upper threshold of serial receive buffer, in characters.
-#define LOWER_THRESHOLD_PRINT_BUFFER     5000  // Flow control lower threshold of print buffer, in print codes.
-#define UPPER_THRESHOLD_PRINT_BUFFER    45000  // Flow control upper threshold of print buffer, in print codes.
+#define LOWER_THRESHOLD_RECEIVE_BUFFER    200  // Flow control lower threshold of serial receive buffer, in characters.
+#define UPPER_THRESHOLD_RECEIVE_BUFFER    800  // Flow control upper threshold of serial receive buffer, in characters.
+#define LOWER_THRESHOLD_PRINT_BUFFER    20000  // Flow control lower threshold of print buffer, in print codes.
+#define UPPER_THRESHOLD_PRINT_BUFFER    80000  // Flow control upper threshold of print buffer, in print codes.
+
+// RS-232 RTS states.
+#define RTS_UNDEFINED    0  // Undefine RTS state.
+#define RTS_OFF          1  // RTS is off.
+#define RTS_ON           2  // RTS is on.
+#define RTS_EMPTYING_SW  3  // RTS is emptying software buffer.
+#define RTS_EMPTYING_HW  4  // RTS is emptying hardware buffer.
+#define RTS_TIMEOUT      5  // RTS is in timeout.
+
+// Escape character types.
+#define ESC_IGNORE         0  // Ignore escape character type.
+#define ESC_CONTROL        1  // Control escape character type.
+#define ESC_CTRL_BEL       2  // Control BEL escape character type.
+#define ESC_CTRL_BS_CR     3  // Control BS thru CR escape character type.
+#define ESC_CTRL_CAN_SUB   4  // Control CAN SUB escape character type.
+#define ESC_CTRL_ESC       5  // Control ESC escape character type.
+#define ESC_PARAMETER      6  // Parameter escape character type.
+#define ESC_INTERMEDIATE   7  // Intermediate escape character type.
+#define ESC_UPPERCASE      8  // Uppercase escape character type.
+#define ESC_UC_STRING      9  // Uppercase P X ] ^ _ escape character type.
+#define ESC_UC_LBRACKET   10  // Uppercase [ escape character type.
+#define ESC_UC_BSLASH     11  // Uppercase \ escape character type.
+#define ESC_LOWERCASE     12  // Lowercase escape character type.
+
+// Escape states.
+#define ESC_INIT_STATE  0  // Initial escape state.
+#define ESC_CSIP_STATE  1  // CSI-P escape state.
+#define ESC_CSII_STATE  2  // CSI-I escape state.
+#define ESC_FUNC_STATE  3  // Function escape state.
+#define ESC_STR_STATE   4  // String escape state.
+
+// Escape actions.
+#define ESC_NONE   0  // No escape action.
+#define ESC_PRINT  1  // Print escape action.
+#define ESC_EXIT   2  // Exit escape action.
+#define ESC_ERROR  3  // Error escape action.
+#define ESC_INIT   4  // Initial escape state action.
+#define ESC_CSIP   5  // CSI-P escape state action.
+#define ESC_CSII   6  // CSI-I escape state action.
+#define ESC_FUNC   7  // Function escape state action.
+#define ESC_STR    8  // String escape state action.
 
 // EEPROM data locations.
 #define EEPROM_FINGERPRINT     0  // EEPROM location of fingerprint byte.                        Used by all emulations.
@@ -1275,6 +1440,7 @@
 #define EEPROM_LMARGIN         5  // EEPROM location of left margin setting byte.                Used by all emulations.
 #define EEPROM_RMARGIN         6  // EEPROM location of right margin setting byte.               Used by all emulations.
 #define EEPROM_EMULATION       7  // EEPROM location of emulation.                               Used by all emulations.
+#define EEPROM_OFFSET         30  // EEPROM location of line offset byte.                        Used by all emulations.
 
 #define EEPROM_SLASH          10  // EEPROM location of slash zero setting byte.                 Used by IBM 1620 Jr.
 #define EEPROM_BOLD           11  // EEPROM location of bold setting byte.                       Used by IBM 1620 Jr.
@@ -1288,13 +1454,12 @@
 #define EEPROM_HWFLOW         26  // EEPROM location of hardware flow control setting byte.      Used by ASCII Terminal.
 #define EEPROM_AUTORETURN     27  // EEPROM location of auto return setting byte.                Used by ASCII Terminal.
 #define EEPROM_TRANSMITEOL    28  // EEPROM location of transmit end-of-line setting byte.       Used by ASCII Terminal.
-#define EEPROM_WIDTH          29  // EEPROM location of paper width byte.                        Used by ASCII Terminal.
-#define EEPROM_OFFSET         30  // EEPROM location of column offset byte.                      Used by ASCII Terminal.
+#define EEPROM_LENGTH         29  // EEPROM location of line length byte.                        Used by ASCII Terminal.
 #define EEPROM_RECEIVEEOL     31  // EEPROM location of receive end-of-line setting byte.        Used by ASCII Terminal.
-#define EEPROM_IGNOREESCAPE   32  // EEPROM location of ignore escape setting byte.              Used by ASCII Terminal.
+#define EEPROM_ESCAPESEQUENCE 32  // EEPROM location of escape sequence setting byte.            Used by ASCII Terminal.
 #define EEPROM_UPPERCASE      33  // EEPROM location of uppercase only setting byte.             Used by ASCII Terminal.
 
-#define EEPROM_TABS          100  // EEPROM location of tab table bytes [166].                   Used by all emulations.
+#define EEPROM_TABS          100  // EEPROM location of tab table bytes [200].                   Used by all emulations.
 
 #define SIZE_EEPROM         4096  // Size of EEPROM.
 
@@ -1302,15 +1467,16 @@
 #define FINGERPRINT  0xdb  // EEPROM fingerprint value.
 
 // Error codes.
-#define ERROR_NULL      0  // Null error.
-#define ERROR_CB_FULL   1  // Command buffer full error.
-#define ERROR_RB_FULL   2  // Receive buffer full error.
-#define ERROR_SB_FULL   3  // Send buffer full error.
-#define ERROR_TB_FULL   4  // Transfer buffer full error.
-#define ERROR_PB_FULL   5  // Print buffer full error.
-#define ERROR_BAD_CODE  6  // Bad print code error.
+#define ERROR_NULL        0  // Null error.
+#define ERROR_CB_FULL     1  // Command buffer full error.
+#define ERROR_RB_FULL     2  // Receive buffer full error.
+#define ERROR_SB_FULL     3  // Send buffer full error.
+#define ERROR_TB_FULL     4  // Transfer buffer full error.
+#define ERROR_PB_FULL     5  // Print buffer full error.
+#define ERROR_BAD_CODE    6  // Bad print code error.
+#define ERROR_BAD_ESCAPE  7  // Bad escape sequence error.
 
-#define NUM_ERRORS      7  // Number of error codes.
+#define NUM_ERRORS              8  // Number of error codes.
 
 // Warning codes.
 #define WARNING_NULL             0  // Null warning.
@@ -1412,34 +1578,47 @@
 #define EOL_LF         3  // LF end-of-line setting.
 #define EOL_LFCR       4  // LF CR end-of-line setting.
 
-// Paper width values.
-#define WIDTH_UNDEFINED    0  // Undefined width setting.
-#define WIDTH_MINIMUM     80  // Minimum paper width.
-#define WIDTH_MAXIMUM    165  // Maximum paper width.
+// Escape sequence types.
+#define ESCAPE_UNDEFINED  0  // Undefined escape sequence setting.
+#define ESCAPE_NONE       1  // None escape sequences setting.
+#define ESCAPE_IGNORE     2  // Ignore escape sequence setting.
+
+// Line length values.
+#define LENGTH_UNDEFINED    0  // Undefined length setting.
+#define LENGTH_DEFAULT     80  // Default line length.
+#define LENGTH_MINIMUM     80  // Minimum line length.
+#if FEATURE_WIDE_CARRIAGE
+  #define LENGTH_MAXIMUM    198  // Maximum line length.
+#else
+  #define LENGTH_MAXIMUM    165  // Maximum line length.
+#endif
 
 // Configuration parameters initial values.
-#define INITIAL_ERRORS        SETTING_TRUE     // Report errors.
-#define INITIAL_WARNINGS      SETTING_FALSE    // Report warnings.
-#define INITIAL_BATTERY       SETTING_FALSE    // Battery installed.
-#define INITIAL_LMARGIN       1                // Left margin.
-#define INITIAL_RMARGIN       80               // Right margin.
-#define INITIAL_EMULATION     EMULATION_NULL   // Current emulation.
-#define INITIAL_SLASH         SETTING_TRUE     // Print slashed zeroes.
-#define INITIAL_BOLD          SETTING_FALSE    // Print bold input.
-#define INITIAL_SERIAL        SERIAL_USB       // Serial type.
-#define INITIAL_DUPLEX        DUPLEX_FULL      // Duplex.
-#define INITIAL_BAUD          BAUD_9600        // Baud rate.
-#define INITIAL_PARITY        PARITY_NONE      // Parity.
-#define INITIAL_DPS           DPS_8N1          // Databits, parity, stopbits.
-#define INITIAL_SWFLOW        SWFLOW_XON_XOFF  // Software flow control.
-#define INITIAL_HWFLOW        HWFLOW_NONE      // Hardware flow control.
-#define INITIAL_UPPERCASE     SETTING_FALSE    // Uppercase only.
-#define INITIAL_AUTORETURN    SETTING_TRUE     // Auto return.
-#define INITIAL_TRANSMITEOL   EOL_CR           // Send end-of-line.
-#define INITIAL_RECEIVEEOL    EOL_CRLF         // Receive end-of-line.
-#define INITIAL_IGNOREESCAPE  SETTING_TRUE     // Ignore escape sequences.
-#define INITIAL_WIDTH         80               // Paper width.
-#define INITIAL_OFFSET        SETTING_TRUE     // Column offset.
+#define INITIAL_ERRORS          SETTING_TRUE     // Report errors.
+#define INITIAL_WARNINGS        SETTING_FALSE    // Report warnings.
+#define INITIAL_BATTERY         SETTING_FALSE    // Battery installed.
+#define INITIAL_LMARGIN         1                // Left margin.
+#define INITIAL_RMARGIN         LENGTH_DEFAULT   // Right margin.
+#define INITIAL_EMULATION       EMULATION_NULL   // Current emulation.
+#define INITIAL_SLASH           SETTING_TRUE     // Print slashed zeroes.
+#define INITIAL_BOLD            SETTING_FALSE    // Print bold input.
+#define INITIAL_SERIAL          SERIAL_USB       // Serial type.
+#define INITIAL_DUPLEX          DUPLEX_FULL      // Duplex.
+#define INITIAL_BAUD            BAUD_9600        // Baud rate.
+#define INITIAL_PARITY          PARITY_NONE      // Parity.
+#define INITIAL_DPS             DPS_8N1          // Databits, parity, stopbits.
+#define INITIAL_SWFLOW          SWFLOW_XON_XOFF  // Software flow control.
+#define INITIAL_HWFLOW          HWFLOW_NONE      // Hardware flow control.
+#define INITIAL_UPPERCASE       SETTING_FALSE    // Uppercase only.
+#define INITIAL_AUTORETURN      SETTING_TRUE     // Auto return.
+#define INITIAL_TRANSMITEOL     EOL_CR           // Send end-of-line.
+#define INITIAL_RECEIVEEOL      EOL_CRLF         // Receive end-of-line.
+#define INITIAL_ESCAPESEQUENCE  ESCAPE_IGNORE    // Escape sequences.
+#define INITIAL_LENGTH          LENGTH_DEFAULT   // Line length.
+#define INITIAL_OFFSET          0                // Column offset.
+#define INITIAL_IBM_OFFSET      0                // Column offset for IBM 1620 Jr.
+#define INITIAL_ASCII_OFFSET    1                // Column offset for ASCII Terminal.
+#define INITIAL_FUTURE_OFFSET   1                // Column offset for future emulation.
 
 //**********************************************************************************************************************
 //
@@ -1491,8 +1670,8 @@ const struct print_info WW_PRINT_REQSPACE = {SPACING_FORWARD, TIMING_NOSHIFT, &W
 const byte WW_STR_Tab[]                   = {WW_Tab_IndL, WW_NULL_14, WW_NULL};
 const struct print_info WW_PRINT_Tab      = {SPACING_TAB, TIMING_TAB, &WW_STR_Tab};
 
-const byte WW_STR_CRtn_IndClr[]           = {WW_CRtn_IndClr, WW_NULL_13, WW_NULL_14, WW_NULL};
-const struct print_info WW_PRINT_CRtn     = {SPACING_RETURN, TIMING_RETURN, &WW_STR_CRtn_IndClr};
+const byte WW_STR_CRtn[]                  = {WW_CRtn_IndClr, WW_NULL_13, WW_NULL_14, WW_NULL};
+const struct print_info WW_PRINT_CRtn     = {SPACING_RETURN, TIMING_RETURN, &WW_STR_CRtn};
 
 // <left shift>, <right shift>, Lock print strings.
 const byte WW_STR_LShift[]              = {WW_LShift, WW_NULL_1, WW_NULL_14, WW_NULL};
@@ -1971,6 +2150,11 @@ const struct print_info WW_PRINT_BEEP          = {SPACING_NONE, TIMING_NONE, &WW
 SlowSoftSerial slow_serial_port (UART_RX_PIN, UART_TX_PIN);
 volatile int rs232_mode = RS232_UNDEFINED;
 
+// RS-232 variables.
+volatile int rts_state = RTS_UNDEFINED;         // Current RTS state.
+volatile int rts_size = 0;                      // Serial buffer size.
+volatile unsigned long rts_timeout_time = 0UL;  // Time when RTS timeout
+
 // Serial Interface Board variables.
 volatile int blue_led_on = LOW;
 volatile int blue_led_off = HIGH;
@@ -1986,7 +2170,8 @@ volatile boolean code = FALSE;          // Current code shift state.
 volatile int key_offset = OFFSET_NONE;  // Offset into action table for shifted keys.
 
 // Escape sequence variables.
-volatile boolean escaping = FALSE;  // In escape sequence.
+volatile boolean escaping = FALSE;              // Currently in escape sequence.
+volatile int escape_state = ESC_INIT_STATE;  // Current escape FSA state.
 
 // End-of-line variables.
 volatile boolean ignore_cr = FALSE;   // Receive ignore cr character.
@@ -2018,7 +2203,8 @@ const char* error_text[NUM_ERRORS] = {NULL,
                                       "Send buffer full errors.",
                                       "Transfer buffer full errors.",
                                       "Print buffer full errors.",
-                                      "Bad print code errors."};
+                                      "Bad print code errors.",
+                                      "Bad escape sequence errors."};
 
 // Warning text table.
 const char* warning_text[NUM_WARNINGS] = {NULL,
@@ -2042,9 +2228,8 @@ const char* data_parity_stops_text[NUM_DPSS] = {NULL, "7o1", "7e1", "8n1", "8o1"
 // Baud rate table.  Note: Baud rates below 1200 are not usable with the hardware UART on Teensy 3.5, but are supported
 //                         by the SlowSoftSerial library.
 //                         Baud rates above 230400 are not supported by the MAX3232 chip.
-const unsigned long baud_rates[NUM_BAUDS] = {0ul, 50ul, 75ul, 110ul, 134ul, 150ul, 200ul, 300ul, 600ul, 1200ul,
-                                             1800ul, 2400ul, 4800ul, 9600ul, 19200ul, 38400ul, 57600ul, 76800ul,
-                                             115200ul, 230400ul, 460800ul, 921600ul};
+const int baud_rates[NUM_BAUDS] = {0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200, 38400,
+                                   57600, 76800, 115200, 230400, 460800, 921600};
 
 // Parity lookup tables.
 const byte odd_parity[128]  = {0x80, 0x01, 0x02, 0x83, 0x04, 0x85, 0x86, 0x07,
@@ -2099,16 +2284,51 @@ const boolean pc_validation[256] = {
         TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
         FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE,  TRUE};
 
-// Escape termination table.
-const boolean terminate_escape[128] = {
-        FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
-        FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
-        FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
-        FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
-        TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE, 
-        TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  FALSE, FALSE, TRUE,  TRUE,  TRUE, 
-        TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE, 
-        TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  FALSE};
+// Escape character table.
+const byte escape_character[128] = {ESC_IGNORE,       ESC_CONTROL,      ESC_CONTROL,      ESC_CONTROL,
+                                    ESC_CONTROL,      ESC_CONTROL,      ESC_CONTROL,      ESC_CTRL_BEL,
+                                    ESC_CTRL_BS_CR,   ESC_CTRL_BS_CR,   ESC_CTRL_BS_CR,   ESC_CTRL_BS_CR,
+                                    ESC_CTRL_BS_CR,   ESC_CTRL_BS_CR,   ESC_CONTROL,      ESC_CONTROL,
+                                    ESC_CONTROL,      ESC_CONTROL,      ESC_CONTROL,      ESC_CONTROL,
+                                    ESC_CONTROL,      ESC_CONTROL,      ESC_CONTROL,      ESC_CONTROL,
+                                    ESC_CTRL_CAN_SUB, ESC_CONTROL,      ESC_CTRL_CAN_SUB, ESC_CTRL_ESC,
+                                    ESC_CONTROL,      ESC_CONTROL,      ESC_CONTROL,      ESC_CONTROL,
+                                    ESC_INTERMEDIATE, ESC_INTERMEDIATE, ESC_INTERMEDIATE, ESC_INTERMEDIATE,
+                                    ESC_INTERMEDIATE, ESC_INTERMEDIATE, ESC_INTERMEDIATE, ESC_INTERMEDIATE,
+                                    ESC_INTERMEDIATE, ESC_INTERMEDIATE, ESC_INTERMEDIATE, ESC_INTERMEDIATE,
+                                    ESC_INTERMEDIATE, ESC_INTERMEDIATE, ESC_INTERMEDIATE, ESC_INTERMEDIATE,
+                                    ESC_PARAMETER,    ESC_PARAMETER,    ESC_PARAMETER,    ESC_PARAMETER,
+                                    ESC_PARAMETER,    ESC_PARAMETER,    ESC_PARAMETER,    ESC_PARAMETER,
+                                    ESC_PARAMETER,    ESC_PARAMETER,    ESC_PARAMETER,    ESC_PARAMETER,
+                                    ESC_PARAMETER,    ESC_PARAMETER,    ESC_PARAMETER,    ESC_PARAMETER,
+                                    ESC_UPPERCASE,    ESC_UPPERCASE,    ESC_UPPERCASE,    ESC_UPPERCASE,
+                                    ESC_UPPERCASE,    ESC_UPPERCASE,    ESC_UPPERCASE,    ESC_UPPERCASE,
+                                    ESC_UPPERCASE,    ESC_UPPERCASE,    ESC_UPPERCASE,    ESC_UPPERCASE,
+                                    ESC_UPPERCASE,    ESC_UPPERCASE,    ESC_UPPERCASE,    ESC_UPPERCASE,
+                                    ESC_UC_STRING,    ESC_UPPERCASE,    ESC_UPPERCASE,    ESC_UPPERCASE,
+                                    ESC_UPPERCASE,    ESC_UPPERCASE,    ESC_UPPERCASE,    ESC_UPPERCASE,
+                                    ESC_UC_STRING,    ESC_UPPERCASE,    ESC_UPPERCASE,    ESC_UC_LBRACKET,
+                                    ESC_UC_BSLASH,    ESC_UC_STRING,    ESC_UC_STRING,    ESC_UC_STRING,
+                                    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,
+                                    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,
+                                    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,
+                                    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,
+                                    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,
+                                    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,
+                                    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,
+                                    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_LOWERCASE,    ESC_IGNORE};
+
+// Escape FSA table.
+const byte escape_fsa[5][13] = {{ESC_NONE,  ESC_PRINT, ESC_PRINT, ESC_PRINT, ESC_EXIT, ESC_INIT, ESC_EXIT,
+                                 ESC_FUNC,  ESC_EXIT,  ESC_STR,   ESC_CSIP,  ESC_EXIT, ESC_EXIT},
+                                {ESC_NONE,  ESC_PRINT, ESC_PRINT, ESC_PRINT, ESC_EXIT, ESC_INIT, ESC_NONE,
+                                 ESC_CSII,  ESC_EXIT,  ESC_EXIT,  ESC_EXIT,  ESC_EXIT, ESC_EXIT},
+                                {ESC_NONE,  ESC_PRINT, ESC_PRINT, ESC_PRINT, ESC_EXIT, ESC_INIT, ESC_ERROR,
+                                 ESC_NONE,  ESC_EXIT,  ESC_EXIT,  ESC_EXIT,  ESC_EXIT, ESC_EXIT},
+                                {ESC_NONE,  ESC_PRINT, ESC_PRINT, ESC_PRINT, ESC_EXIT, ESC_INIT, ESC_EXIT,
+                                 ESC_NONE,  ESC_EXIT,  ESC_EXIT,  ESC_EXIT,  ESC_EXIT, ESC_EXIT},
+                                {ESC_NONE,  ESC_PRINT, ESC_EXIT,  ESC_NONE,  ESC_EXIT, ESC_INIT, ESC_NONE,
+                                 ESC_NONE,  ESC_NONE,  ESC_NONE,  ESC_NONE,  ESC_NONE, ESC_NONE}};
 
 // Key action variables.
 volatile const struct key_action (*key_actions)[3 * NUM_WW_KEYS] = NULL;       // Current key action table.
@@ -2130,11 +2350,11 @@ volatile int warning_counts[NUM_WARNINGS];  // Count of warnings by warning code
 volatile int current_column = INITIAL_LMARGIN;             // Current typewriter print column.
 volatile const struct print_info *previous_string = NULL;  // Previous print string.
 
-// Flow control variables.
-volatile boolean flow_in_on = FALSE;   // Input flow control turned on.
-volatile boolean flow_out_on = FALSE;  // Output flow control turned on.
-volatile byte flow_on = 0x00;          // Turn on flow control character.
-volatile byte flow_off = 0x00;         // Turn off flow control character.
+// Software flow control variables.
+volatile boolean flow_in_on = TRUE;   // Input flow control turned on.
+volatile boolean flow_out_on = TRUE;  // Output flow control turned on.
+volatile byte flow_on = 0x00;         // Turn on flow control character.
+volatile byte flow_off = 0x00;        // Turn off flow control character.
 
 // Command buffer variables (write: ISR, read: main).
 volatile int cb_read = 0;   // Index of current read position of command buffer.
@@ -2155,9 +2375,9 @@ volatile int sb_count = 0;  // Count of of characters in send buffer.
 volatile byte send_buffer[SIZE_SEND_BUFFER] = {0};  // Circular send buffer.
 
 // Transfer buffer variables (write: ISR, read: main).
-volatile int tb_read = 0;   // Index of current read position of print buffer.
-volatile int tb_write = 0;  // Index of current write position of print buffer.
-volatile int tb_count = 0;  // Count of of characters in print buffer.
+volatile int tb_read = 0;   // Index of current read position of transfer buffer.
+volatile int tb_write = 0;  // Index of current write position of transfer buffer.
+volatile int tb_count = 0;  // Count of of characters in transfer buffer.
 volatile const struct print_info *transfer_buffer[SIZE_TRANSFER_BUFFER] = {NULL};  // Circular transfer buffer.
 
 // Print buffer variables (write: main, read: ISR).
@@ -2167,31 +2387,31 @@ volatile int pb_count = 0;  // Count of of characters in print buffer.
 volatile byte print_buffer[SIZE_PRINT_BUFFER] = {0};  // Circular print buffer.
 
 // Configuration parameters stored in EEPROM.
-volatile byte errors = INITIAL_ERRORS;              // Report errors.               Used by all emulations.
-volatile byte warnings = INITIAL_WARNINGS;          // Report warnings.             Used by all emulations.
-volatile byte battery = INITIAL_BATTERY;            // Battery installed.           Used by all emulations.
-volatile byte lmargin = INITIAL_LMARGIN;            // Left margin.                 Used by all emulations.
-volatile byte rmargin = INITIAL_RMARGIN;            // Right margin.                Used by all emulations.
-volatile byte emulation = INITIAL_EMULATION;        // Current emulation.           Used by all emulations.
+volatile byte errors = INITIAL_ERRORS;                  // Report errors.               Used by all emulations.
+volatile byte warnings = INITIAL_WARNINGS;              // Report warnings.             Used by all emulations.
+volatile byte battery = INITIAL_BATTERY;                // Battery installed.           Used by all emulations.
+volatile byte lmargin = INITIAL_LMARGIN;                // Left margin.                 Used by all emulations.
+volatile byte rmargin = INITIAL_RMARGIN;                // Right margin.                Used by all emulations.
+volatile byte emulation = INITIAL_EMULATION;            // Current emulation.           Used by all emulations.
+volatile byte offset = INITIAL_OFFSET;                  // Column offset.               Used by all emulations.
 
-volatile byte slash = INITIAL_SLASH;                // Print slashed zeroes.        Used by IBM 1620 Jr.
-volatile byte bold = INITIAL_BOLD;                  // Print bold input.            Used by IBM 1620 Jr.
+volatile byte slash = INITIAL_SLASH;                    // Print slashed zeroes.        Used by IBM 1620 Jr.
+volatile byte bold = INITIAL_BOLD;                      // Print bold input.            Used by IBM 1620 Jr.
 
-volatile byte serial = INITIAL_SERIAL;              // Serial type.                 Used by ASCII Terminal.
-volatile byte duplex = INITIAL_DUPLEX;              // Duplex.                      Used by ASCII Terminal.
-volatile byte baud = INITIAL_BAUD;                  // Baud rate.                   Used by ASCII Terminal (RS-232).
-volatile byte parity = INITIAL_PARITY;              // Parity.                      Used by ASCII Terminal (USB).
-volatile byte dps = INITIAL_DPS;                    // Databits, parity, stopbits.  Used by ASCII Terminal (RS-232).
-volatile byte swflow = INITIAL_SWFLOW;              // Software flow control.       Used by ASCII Terminal.
-volatile byte hwflow = INITIAL_HWFLOW;              // Hardware flow control.       Used by ASCII Terminal (RS-232).
-volatile byte uppercase = INITIAL_UPPERCASE;        // Uppercase only.              Used by ASCII Terminal.
-volatile byte autoreturn = INITIAL_AUTORETURN;      // Auto return.                 Used by ASCII Terminal.
-volatile byte transmiteol = INITIAL_TRANSMITEOL;    // Send end-of-line.            Used by ASCII Terminal.
-volatile byte receiveeol = INITIAL_RECEIVEEOL;      // Receive end-of-line.         Used by ASCII Terminal.
-volatile byte ignoreescape = INITIAL_IGNOREESCAPE;  // Ignore escape sequences.     Used by ASCII Terminal.
-volatile byte width = INITIAL_WIDTH;                // Paper width.                 Used by ASCII Terminal.
-volatile byte offset = INITIAL_OFFSET;              // Column offset.               Used by ASCII Terminal.
-volatile byte tabs[166] = {SETTING_UNDEFINED};      // Tab settings.                Used by ASCII Terminal.
+volatile byte serial = INITIAL_SERIAL;                  // Serial type.                 Used by ASCII Terminal.
+volatile byte duplex = INITIAL_DUPLEX;                  // Duplex.                      Used by ASCII Terminal.
+volatile byte baud = INITIAL_BAUD;                      // Baud rate.                   Used by ASCII Terminal (RS-232).
+volatile byte parity = INITIAL_PARITY;                  // Parity.                      Used by ASCII Terminal (USB).
+volatile byte dps = INITIAL_DPS;                        // Databits, parity, stopbits.  Used by ASCII Terminal (RS-232).
+volatile byte swflow = INITIAL_SWFLOW;                  // Software flow control.       Used by ASCII Terminal.
+volatile byte hwflow = INITIAL_HWFLOW;                  // Hardware flow control.       Used by ASCII Terminal (RS-232).
+volatile byte uppercase = INITIAL_UPPERCASE;            // Uppercase only.              Used by ASCII Terminal.
+volatile byte autoreturn = INITIAL_AUTORETURN;          // Auto return.                 Used by ASCII Terminal.
+volatile byte transmiteol = INITIAL_TRANSMITEOL;        // Send end-of-line.            Used by ASCII Terminal.
+volatile byte receiveeol = INITIAL_RECEIVEEOL;          // Receive end-of-line.         Used by ASCII Terminal.
+volatile byte escapesequence = INITIAL_ESCAPESEQUENCE;  // Escape sequence.             Used by ASCII Terminal.
+volatile byte length = INITIAL_LENGTH;                  // Line length.                 Used by ASCII Terminal.
+volatile byte tabs[200] = {SETTING_UNDEFINED};          // Tab settings.                Used by ASCII Terminal.
 
 
 
@@ -4120,8 +4340,9 @@ void Setup_IBM () {
   key_actions = &IBM_ACTIONS_MODE0;
   serial_actions = &IBM_SERIAL_ACTIONS;
   serial = SERIAL_USB;
-  flow_on = CHAR_IBM_PAUSE;
-  flow_off = CHAR_IBM_RESUME;
+  flow_on = CHAR_IBM_RESUME;
+  flow_off = CHAR_IBM_PAUSE;
+  swflow = SWFLOW_XON_XOFF;
   hwflow = HWFLOW_NONE;
   artn_IBM = FALSE;
   bold_IBM = FALSE;
@@ -4142,14 +4363,14 @@ void Setup_IBM () {
 
 // Print IBM 1620 Jr. setup title.
 void Print_IBM_setup_title () {
-  Print_string (&WW_PRINT_CRtn);  Print_string (&WW_PRINT_CRtn);
-  Print_characters ("---- Cadetwriter: " IBM_VERSION " Setup");
-  Print_string (&WW_PRINT_CRtn);  Print_string (&WW_PRINT_CRtn);
+
+  Print_characters ("\r\r---- Cadetwriter: " IBM_VERSION " Setup\r\r");
 }
 
 // Update IBM 1620 Jr. settings.
 void Update_IBM_settings () {
   byte obattery = battery;
+  byte ooffset = offset;
 
   // Query new settings.
   Print_string (&WW_PRINT_CRtn);
@@ -4158,6 +4379,7 @@ void Update_IBM_settings () {
   battery = Read_truefalse_setting ("batteries installed", battery);
   slash = Read_truefalse_setting ("slash zeroes", slash);
   bold = Read_truefalse_setting ("bold input", bold);
+  offset = Read_integer_setting ("line offset", offset, 0, 10);
   Print_string (&WW_PRINT_CRtn);
 
   // Save settings in EEPROM if requested.
@@ -4167,17 +4389,19 @@ void Update_IBM_settings () {
     Write_EEPROM (EEPROM_BATTERY, battery);
     Write_EEPROM (EEPROM_SLASH, slash);
     Write_EEPROM (EEPROM_BOLD, bold);
+    Write_EEPROM (EEPROM_OFFSET, offset);
   }
   Print_string (&WW_PRINT_CRtn);
  
-  // Set margins and tabs if battery changed.
-  if (obattery != battery) {
+  // Reset margins and tabs if battery or offset changed.
+  if ((obattery != battery) || (ooffset != offset)) {
     Set_margins_tabs (TRUE);
   }
 }
 
 // Print IBM 1620 Jr. character set.
 void Print_IBM_character_set ()  {
+
   Print_string (&WW_PRINT_CRtn);  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
   Print_string (&WW_PRINT_A);  Print_string (&WW_PRINT_B);  Print_string (&WW_PRINT_C);  Print_string (&WW_PRINT_D);
   Print_string (&WW_PRINT_E);  Print_string (&WW_PRINT_F);  Print_string (&WW_PRINT_G);  Print_string (&WW_PRINT_H);
@@ -5903,7 +6127,6 @@ void Setup_ASCII () {
   serial_actions = &ASCII_SERIAL_ACTIONS;
   flow_on = CHAR_ASCII_XON;
   flow_off = CHAR_ASCII_XOFF;
-  digitalWriteFast (serial_rts_pin, HIGH);
 }
 
 
@@ -5915,9 +6138,8 @@ void Setup_ASCII () {
 
 // Print ASCII Terminal setup title.
 void Print_ASCII_setup_title () {
-  Print_string (&WW_PRINT_CRtn);  Print_string (&WW_PRINT_CRtn);
-  Print_characters ("---- Cadetwriter: " ASCII_VERSION " Setup");
-  Print_string (&WW_PRINT_CRtn);  Print_string (&WW_PRINT_CRtn);
+
+  Print_characters ("\r\r---- Cadetwriter: " ASCII_VERSION " Setup\r\r");
 }
 
 // Update ASCII Terminal settings.
@@ -5927,7 +6149,9 @@ void Update_ASCII_settings () {
   byte oparity = parity;
   byte obaud = baud;
   byte odps = dps;
-  byte owidth = width;
+  byte olength = length;
+  byte ooffset = offset;
+  byte ohwflow = hwflow;
 
   // Query new settings.
   Print_string (&WW_PRINT_CRtn);
@@ -5943,10 +6167,10 @@ void Update_ASCII_settings () {
     dps = Read_dps_setting ("dps", dps);
   }
   swflow = Read_swflow_setting ("sw flow control", swflow);
-  if (serial == SERIAL_RS232) {
-    hwflow = Read_hwflow_setting ("hw flow control", hwflow);
-  } else {
+  if (serial == SERIAL_USB) {
     hwflow = HWFLOW_NONE;
+  } else /* serial == SERIAL_RS232 */ {
+    hwflow = Read_hwflow_setting ("hw flow control", hwflow);
   }
   uppercase = Read_truefalse_setting ("uppercase only", uppercase);
   if (duplex == DUPLEX_HALF) {
@@ -5965,14 +6189,14 @@ void Update_ASCII_settings () {
   autoreturn = Read_truefalse_setting ("auto return", autoreturn);
   transmiteol = Read_eol_setting ("transmit end-of-line", transmiteol);
   receiveeol = Read_eol_setting ("receive end-of-line", receiveeol);
-  ignoreescape = Read_truefalse_setting ("ignore escape sequences", ignoreescape);
-  width = Read_width_setting ("paper width", width);
-  offset = Read_truefalse_setting ("column offset", offset);
+  escapesequence = Read_escapesequence_setting ("escape sequences", escapesequence);
+  length = Read_integer_setting ("line length", length, LENGTH_MINIMUM, LENGTH_MAXIMUM);
+  offset = Read_integer_setting ("line offset", offset, 1, 10);
   Print_string (&WW_PRINT_CRtn);
 
-  // Reset right margin if width changed.
-  if (owidth != width) {
-    rmargin = width;
+  // Reset right margin if length changed.
+  if (olength != length) {
+    rmargin = length;
     Write_EEPROM (EEPROM_RMARGIN, rmargin);
   }
 
@@ -5992,28 +6216,29 @@ void Update_ASCII_settings () {
     Write_EEPROM (EEPROM_AUTORETURN, autoreturn);
     Write_EEPROM (EEPROM_TRANSMITEOL, transmiteol);
     Write_EEPROM (EEPROM_RECEIVEEOL, receiveeol);
-    Write_EEPROM (EEPROM_IGNOREESCAPE, ignoreescape);
-    Write_EEPROM (EEPROM_WIDTH, width);
+    Write_EEPROM (EEPROM_ESCAPESEQUENCE, escapesequence);
+    Write_EEPROM (EEPROM_LENGTH, length);
     Write_EEPROM (EEPROM_OFFSET, offset);
   }
   Print_string (&WW_PRINT_CRtn);
 
   // Reset communications if any communication changes.
-  if ((oserial != serial) || (oparity != parity) || (obaud != baud) || (odps != dps)) {
-    flow_in_on = FALSE;
-    flow_out_on = FALSE;
+  if ((oserial != serial) || (oparity != parity) || (obaud != baud) || (odps != dps) || (ohwflow != hwflow)) {
+    flow_in_on = TRUE;
+    flow_out_on = TRUE;
     Serial_end (oserial);
     Serial_begin ();
   }
  
-  // Reset margins and tabs if battery or width changed.
-  if ((obattery != battery) || (owidth != width)) {
+  // Reset margins and tabs if battery, length, or offset changed.
+  if ((obattery != battery) || (olength != length) || (ooffset != offset)) {
     Set_margins_tabs (TRUE);
   }
 }
 
 // Print ASCII Terminal character set.
 void Print_ASCII_character_set ()  {
+
   Print_string (&WW_PRINT_CRtn);  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
   Print_string (&WW_PRINT_A);  Print_string (&WW_PRINT_B);  Print_string (&WW_PRINT_C);  Print_string (&WW_PRINT_D);
   Print_string (&WW_PRINT_E);  Print_string (&WW_PRINT_F);  Print_string (&WW_PRINT_G);  Print_string (&WW_PRINT_H);
@@ -6077,6 +6302,137 @@ void Print_ASCII_character_set ()  {
 //  Future serial action table.
 //
 //**********************************************************************************************************************
+
+const struct serial_action FUTURE_SERIAL_ACTIONS[128] = { 
+  {CMD_NONE,       NULL},                      // NUL
+  {CMD_NONE,       NULL},                      // SOH
+  {CMD_NONE,       NULL},                      // STX
+  {CMD_NONE,       NULL},                      // ETX
+  {CMD_NONE,       NULL},                      // EOT
+  {CMD_NONE,       NULL},                      // ENQ
+  {CMD_NONE,       NULL},                      // ACK
+  {CMD_PRINT,      &WW_PRINT_BEEP},            // BEL
+  {CMD_PRINT,      &WW_PRINT_Backspace},       // BS
+  {CMD_PRINT,      &WW_PRINT_Tab},             // TAB
+  {CMD_ASCII_LF,   NULL},                      // LF
+  {CMD_NONE,       NULL},                      // VT
+  {CMD_NONE,       NULL},                      // FF
+  {CMD_ASCII_CR,   &WW_PRINT_CRtn},            // CR
+  {CMD_NONE,       NULL},                      // SO
+  {CMD_NONE,       NULL},                      // SI
+  {CMD_NONE,       NULL},                      // DLE
+  {CMD_ASCII_XON,  NULL},                      // DC1/XON
+  {CMD_NONE,       NULL},                      // DC2
+  {CMD_ASCII_XOFF, NULL},                      // DC3/XOFF
+  {CMD_NONE,       NULL},                      // DC4
+  {CMD_NONE,       NULL},                      // NAK
+  {CMD_NONE,       NULL},                      // SYN
+  {CMD_NONE,       NULL},                      // ETB
+  {CMD_NONE,       NULL},                      // CAN
+  {CMD_NONE,       NULL},                      // EM
+  {CMD_NONE,       NULL},                      // SUB
+  {CMD_NONE,       NULL},                      // ESC
+  {CMD_NONE,       NULL},                      // FS
+  {CMD_NONE,       NULL},                      // GS
+  {CMD_NONE,       NULL},                      // RS
+  {CMD_NONE,       NULL},                      // US
+  {CMD_PRINT,      &WW_PRINT_SPACE},           //
+  {CMD_PRINT,      &WW_PRINT_EXCLAMATION},     // !
+  {CMD_PRINT,      &WW_PRINT_QUOTE},           // "
+  {CMD_PRINT,      &WW_PRINT_POUND},           // #
+  {CMD_PRINT,      &WW_PRINT_DOLLAR},          // $
+  {CMD_PRINT,      &WW_PRINT_PERCENT},         // %
+  {CMD_PRINT,      &WW_PRINT_AMPERSAND},       // &
+  {CMD_PRINT,      &WW_PRINT_APOSTROPHE},      // '
+  {CMD_PRINT,      &WW_PRINT_LPAREN},          // (
+  {CMD_PRINT,      &WW_PRINT_RPAREN},          // )
+  {CMD_PRINT,      &WW_PRINT_ASTERISK},        // *
+  {CMD_PRINT,      &WW_PRINT_PLUS},            // +
+  {CMD_PRINT,      &WW_PRINT_COMMA},           // , 
+  {CMD_PRINT,      &WW_PRINT_HYPHEN},          // -
+  {CMD_PRINT,      &WW_PRINT_PERIOD},          // .
+  {CMD_PRINT,      &WW_PRINT_SLASH},           // /
+  {CMD_PRINT,      &WW_PRINT_0},               // 0
+  {CMD_PRINT,      &WW_PRINT_1},               // 1
+  {CMD_PRINT,      &WW_PRINT_2},               // 2
+  {CMD_PRINT,      &WW_PRINT_3},               // 3
+  {CMD_PRINT,      &WW_PRINT_4},               // 4
+  {CMD_PRINT,      &WW_PRINT_5},               // 5
+  {CMD_PRINT,      &WW_PRINT_6},               // 6
+  {CMD_PRINT,      &WW_PRINT_7},               // 7
+  {CMD_PRINT,      &WW_PRINT_8},               // 8
+  {CMD_PRINT,      &WW_PRINT_9},               // 9
+  {CMD_PRINT,      &WW_PRINT_COLON},           // :
+  {CMD_PRINT,      &WW_PRINT_SEMICOLON},       // ;
+  {CMD_PRINT,      &ASCII_PRINT_LESS},         // <
+  {CMD_PRINT,      &WW_PRINT_EQUAL},           // =
+  {CMD_PRINT,      &ASCII_PRINT_GREATER},      // >
+  {CMD_PRINT,      &WW_PRINT_QUESTION},        // ?
+  {CMD_PRINT,      &WW_PRINT_AT},              // @
+  {CMD_PRINT,      &WW_PRINT_A},               // A
+  {CMD_PRINT,      &WW_PRINT_B},               // B
+  {CMD_PRINT,      &WW_PRINT_C},               // C
+  {CMD_PRINT,      &WW_PRINT_D},               // D
+  {CMD_PRINT,      &WW_PRINT_E},               // E
+  {CMD_PRINT,      &WW_PRINT_F},               // F
+  {CMD_PRINT,      &WW_PRINT_G},               // G
+  {CMD_PRINT,      &WW_PRINT_H},               // H
+  {CMD_PRINT,      &WW_PRINT_I},               // I
+  {CMD_PRINT,      &WW_PRINT_J},               // J
+  {CMD_PRINT,      &WW_PRINT_K},               // K
+  {CMD_PRINT,      &WW_PRINT_L},               // L
+  {CMD_PRINT,      &WW_PRINT_M},               // M
+  {CMD_PRINT,      &WW_PRINT_N},               // N
+  {CMD_PRINT,      &WW_PRINT_O},               // O
+  {CMD_PRINT,      &WW_PRINT_P},               // P
+  {CMD_PRINT,      &WW_PRINT_Q},               // Q
+  {CMD_PRINT,      &WW_PRINT_R},               // R
+  {CMD_PRINT,      &WW_PRINT_S},               // S
+  {CMD_PRINT,      &WW_PRINT_T},               // T
+  {CMD_PRINT,      &WW_PRINT_U},               // U
+  {CMD_PRINT,      &WW_PRINT_V},               // V
+  {CMD_PRINT,      &WW_PRINT_W},               // W
+  {CMD_PRINT,      &WW_PRINT_X},               // X
+  {CMD_PRINT,      &WW_PRINT_Y},               // Y
+  {CMD_PRINT,      &WW_PRINT_Z},               // Z
+  {CMD_PRINT,      &WW_PRINT_LBRACKET},        // [
+  {CMD_PRINT,      &ASCII_PRINT_BSLASH},       // <backslash>
+  {CMD_PRINT,      &WW_PRINT_RBRACKET},        // ]
+  {CMD_PRINT,      &ASCII_PRINT_CARET},        // ^
+  {CMD_PRINT,      &WW_PRINT_UNDERSCORE},      // _
+  {CMD_PRINT,      &ASCII_PRINT_BAPOSTROPHE},  // `
+  {CMD_PRINT,      &WW_PRINT_a},               // a
+  {CMD_PRINT,      &WW_PRINT_b},               // b
+  {CMD_PRINT,      &WW_PRINT_c},               // c
+  {CMD_PRINT,      &WW_PRINT_d},               // d
+  {CMD_PRINT,      &WW_PRINT_e},               // e
+  {CMD_PRINT,      &WW_PRINT_f},               // f
+  {CMD_PRINT,      &WW_PRINT_g},               // g
+  {CMD_PRINT,      &WW_PRINT_h},               // h
+  {CMD_PRINT,      &WW_PRINT_i},               // i
+  {CMD_PRINT,      &WW_PRINT_j},               // j
+  {CMD_PRINT,      &WW_PRINT_k},               // k
+  {CMD_PRINT,      &WW_PRINT_l},               // l
+  {CMD_PRINT,      &WW_PRINT_m},               // m
+  {CMD_PRINT,      &WW_PRINT_n},               // n
+  {CMD_PRINT,      &WW_PRINT_o},               // o
+  {CMD_PRINT,      &WW_PRINT_p},               // p
+  {CMD_PRINT,      &WW_PRINT_q},               // q
+  {CMD_PRINT,      &WW_PRINT_r},               // r
+  {CMD_PRINT,      &WW_PRINT_s},               // s
+  {CMD_PRINT,      &WW_PRINT_t},               // t
+  {CMD_PRINT,      &WW_PRINT_u},               // u
+  {CMD_PRINT,      &WW_PRINT_v},               // v
+  {CMD_PRINT,      &WW_PRINT_w},               // w
+  {CMD_PRINT,      &WW_PRINT_x},               // x
+  {CMD_PRINT,      &WW_PRINT_y},               // y
+  {CMD_PRINT,      &WW_PRINT_z},               // z
+  {CMD_PRINT,      &ASCII_PRINT_LBRACE},       // {
+  {CMD_PRINT,      &ASCII_PRINT_BAR},          // |
+  {CMD_PRINT,      &ASCII_PRINT_RBRACE},       // }
+  {CMD_PRINT,      &ASCII_PRINT_TILDE},        // ~
+  {CMD_NONE,       NULL}                       // DEL
+};
 
 
 //**********************************************************************************************************************
@@ -6346,11 +6702,10 @@ const struct key_action FUTURE_ACTIONS_SETUP[3 * NUM_WW_KEYS] = {
 //**********************************************************************************************************************
 
 void Setup_FUTURE () {
-  // key_actions = 
-  // serial_actions = 
-  // flow_on = 
-  // flow_off = 
-  // digitalWriteFast (serial_rts_pin, HIGH);
+  // key_actions = &FUTURE_ACTIONS_
+  // serial_actions = &FUTURE_SERIAL_ACTIONS;
+  // flow_on = CHAR_ASCII_XON;
+  // flow_off = CHAR_ASCII_XOFF;
 }
 
 
@@ -6625,17 +6980,44 @@ void loop () {
   // Receive all pending characters.
   while (Serial_available ()) {
     byte chr = Serial_read () & 0x7f;
-    if (rb_count >= SIZE_RECEIVE_BUFFER) {  // Character doesn't fit in receive buffer.
-      Report_error (ERROR_RB_FULL);
-      break;
-    }
 
     // Handle escape sequences.
     if (escaping) {
-      if (terminate_escape[chr]) escaping = FALSE;
-      continue;
-    } else if ((ignoreescape == SETTING_TRUE) && (chr == CHAR_ASCII_ESC)) {
+      switch ((int)escape_fsa[escape_state][escape_character[chr]]) {
+        case ESC_NONE:
+          continue;
+        case ESC_PRINT:
+          break;
+        case ESC_EXIT:
+          escaping = FALSE;
+          continue;
+        case ESC_ERROR:
+          Report_error (ERROR_BAD_ESCAPE);
+          escaping = FALSE;
+          break;
+        case ESC_INIT:
+          escape_state = ESC_INIT_STATE;
+          continue;
+        case ESC_CSIP:
+          escape_state = ESC_CSIP_STATE;
+          continue;
+        case ESC_CSII:
+          escape_state = ESC_CSII_STATE;
+          continue;
+        case ESC_FUNC:
+          escape_state = ESC_FUNC_STATE;
+          continue;
+        case ESC_STR:
+          escape_state = ESC_STR_STATE;
+          continue;
+        default:
+          Report_error (ERROR_BAD_ESCAPE);
+          escaping = FALSE;
+          break;
+      }
+    } else if ((chr == CHAR_ASCII_ESC) && (escapesequence == ESCAPE_IGNORE)) {
       escaping = TRUE;
+      escape_state = ESC_INIT_STATE;
       continue;
     }
 
@@ -6648,40 +7030,72 @@ void loop () {
       if (chr == CHAR_ASCII_LF) continue;
     }
 
-    // Receive buffer getting full, turn flow control on.
-    if ((rb_count >= UPPER_THRESHOLD_RECEIVE_BUFFER) && !flow_in_on) {
+    // Handle receive buffer full errors.
+    if (rb_count >= SIZE_RECEIVE_BUFFER) {
+      Report_error (ERROR_RB_FULL);
+      break;
+    }
+
+    // Receive buffer getting full, turn flow control off.
+    if (flow_in_on && (rb_count >= UPPER_THRESHOLD_RECEIVE_BUFFER)) {
       if (swflow == SWFLOW_XON_XOFF) {
-        if (Serial_write (flow_on) == 1) {
+        if (Serial_write (flow_off) == 1) {
           Serial_send_now ();
-          flow_in_on = TRUE;
+          flow_in_on = FALSE;
         }
       }
-      if (hwflow == HWFLOW_RTR_CTS) {
-        digitalWriteFast (serial_rts_pin, LOW);
-        flow_in_on = TRUE;
+      if ((serial == SERIAL_RS232) && (hwflow == HWFLOW_RTR_CTS)) {
+        digitalWriteFast (serial_rts_pin, HIGH);
+        flow_in_on = FALSE;
       }
     }
 
+    // Store character in receive buffer.
     receive_buffer[rb_write] = chr;
     if (++rb_write >= SIZE_RECEIVE_BUFFER) rb_write = 0;
     ++rb_count;
   }
 
   // Send all pending characters.
-  if ((!flow_out_on) && ((hwflow == HWFLOW_NONE) || (digitalReadFast (serial_cts_pin) == LOW))) {
-    boolean sent = FALSE;
-    while (sb_count > 0) {
-      byte c = send_buffer[sb_read] & 0x7f;
-      if (serial == SERIAL_USB) {
-        if (parity == PARITY_ODD) c = odd_parity[c];
-        else if (parity == PARITY_EVEN) c = even_parity[c];
-      }
-      if (Serial_write (c) != 1) break;
-      if (++sb_read >= SIZE_SEND_BUFFER) sb_read = 0;
-      Update_counter (&sb_count, -1);
-      sent = TRUE;
+  boolean sent = FALSE;
+  while (sb_count > 0) {
+    byte c = send_buffer[sb_read] & 0x7f;
+    if (serial == SERIAL_USB) {
+      if (parity == PARITY_ODD) c = odd_parity[c];
+      else if (parity == PARITY_EVEN) c = even_parity[c];
     }
-    if (sent) Serial_send_now ();
+    if (Serial_write (c) != 1) break;
+    if (++sb_read >= SIZE_SEND_BUFFER) sb_read = 0;
+    Update_counter (&sb_count, -1);
+    sent = TRUE;
+  }
+  if (sent) Serial_send_now ();
+
+  // Turn off RTS when all characters have been sent.
+  if ((sb_count == 0) && (serial == SERIAL_RS232) && (hwflow == HWFLOW_RTS_CTS)) {
+    if (rts_state == RTS_ON) {
+      rts_state = RTS_EMPTYING_SW;
+    }
+    if (rts_state == RTS_EMPTYING_SW) {
+      if (rs232_mode == RS232_UART) {
+        if (Serial1.availableForWrite () == rts_size) {
+          rts_state = RTS_EMPTYING_HW;
+        }
+      } else /* rs232_mode == RS232_SLOW */ {
+        if (slow_serial_port.availableForWrite () == rts_size) {
+          rts_state = RTS_TIMEOUT;
+          rts_timeout_time = millis () + RTS_TIMEOUT_DELAY;
+        }
+      }
+    }
+    if ((rts_state == RTS_EMPTYING_HW) && (UART0_S1 & UART_S1_TC)) {
+      rts_state = RTS_TIMEOUT;
+      rts_timeout_time = millis () + RTS_TIMEOUT_DELAY;
+    }
+    if ((rts_state == RTS_TIMEOUT) && (millis () >= rts_timeout_time)) {
+      digitalWriteFast (serial_rts_pin, HIGH);
+      rts_state = RTS_OFF;
+    }
   }
 
   // Print all transferred print strings.
@@ -6712,17 +7126,17 @@ void loop () {
     if (++rb_read >= SIZE_RECEIVE_BUFFER) rb_read = 0;
     --rb_count;
 
-    // Receive buffer almost empty, turn flow control off.
-    if ((rb_count <= LOWER_THRESHOLD_RECEIVE_BUFFER) && flow_in_on) {
+    // Receive buffer almost empty, turn flow control on.
+    if (!flow_in_on && (rb_count <= LOWER_THRESHOLD_RECEIVE_BUFFER)) {
       if (swflow == SWFLOW_XON_XOFF) {
-        if (Serial_write (flow_off) == 1) {
+        if (Serial_write (flow_on) == 1) {
           Serial_send_now ();
-          flow_in_on = FALSE;
+          flow_in_on = TRUE;
         }
       }
-      if (hwflow == HWFLOW_RTR_CTS) {
-        digitalWriteFast (serial_rts_pin, HIGH);
-        flow_in_on = FALSE;
+      if ((serial == SERIAL_RS232) && (hwflow == HWFLOW_RTR_CTS)) {
+        digitalWriteFast (serial_rts_pin, LOW);
+        flow_in_on = TRUE;
       }
     }
 
@@ -6803,8 +7217,8 @@ void loop () {
         shift_lock = FALSE;
         code = FALSE;
         key_offset = OFFSET_NONE;
-        flow_in_on = FALSE;
-        flow_out_on = FALSE;
+        flow_in_on = TRUE;
+        flow_out_on = TRUE;
         Set_margins_tabs (TRUE);
         if (artn_IBM) { Print_string (&WW_PRINT_ARtn);  artn_IBM = FALSE; }
         if (bold_IBM) { Print_string (&WW_PRINT_Bold);  bold_IBM = FALSE; }
@@ -6813,11 +7227,11 @@ void loop () {
         break;
 
       case CMD_IBM_PAUSE:
-        flow_out_on = TRUE;
+        flow_out_on = FALSE;
         break;
 
       case CMD_IBM_RESUME:
-        flow_out_on = FALSE;
+        flow_out_on = TRUE;
         break;
 
       // ASCII Terminal specific actions.
@@ -6874,7 +7288,15 @@ void loop () {
   // Handle IBM 1620 Jr. setup mode.
   if (run_mode == MODE_IBM_BEING_SETUP) {
 
-    if (shift) {  // Reset all settings to factory defaults.
+    // Stop computer sending data.
+    if (flow_in_on) {
+      if (Serial_write (flow_off) == 1) {
+        Serial_send_now ();
+      }
+    }
+
+    // Reset all settings to factory defaults.
+    if (shift) {
       run_mode = MODE_INITIALIZING;
       Initialize_global_variables ();
       Initialize_configuration_settings (TRUE);
@@ -6888,7 +7310,8 @@ void loop () {
       Print_characters ("---- All settings reset to factory defaults.\r\r");
       Wait_print_buffer_empty ();
 
-    } else {  // Interactive setup.
+    // Interactive setup.
+    } else {
       if (artn_IBM) Print_string (&WW_PRINT_ARtn);
       if (bold_IBM) Print_string (&WW_PRINT_Bold);
       if (lock_IBM) Print_string (&WW_PRINT_LShift);
@@ -6913,12 +7336,32 @@ void loop () {
       key_actions = key_actions_save;
       run_mode = MODE_RUNNING;
     }
+
+    // Restore computer sending data.
+    if (flow_in_on) {
+      if (Serial_write (flow_on) == 1) {
+        Serial_send_now ();
+      }
+    }
   }
 
   // Handle ASCII Terminal setup mode.
   if (run_mode == MODE_ASCII_BEING_SETUP) {
 
-    if (shift) {  // Reset all settings to factory defaults.
+    // Stop computer sending data.
+    if (flow_in_on) {
+      if (swflow == SWFLOW_XON_XOFF) {
+        if (Serial_write (flow_off) == 1) {
+          Serial_send_now ();
+        }
+      }
+      if ((serial == SERIAL_RS232) && (hwflow == HWFLOW_RTR_CTS)) {
+        digitalWriteFast (serial_rts_pin, HIGH);
+      }
+    }
+
+    // Reset all settings to factory defaults.
+    if (shift) {
       run_mode = MODE_INITIALIZING;
       Initialize_global_variables ();
       Initialize_configuration_settings (TRUE);
@@ -6929,7 +7372,8 @@ void loop () {
       Print_characters ("---- All settings reset to factory defaults.\r\r");
       Wait_print_buffer_empty ();
 
-    } else {  // Interactive setup.
+    // Interactive setup.
+    } else {
       Print_ASCII_setup_title ();
       while (TRUE) {
         char cmd = Read_setup_command ();
@@ -6948,12 +7392,37 @@ void loop () {
       key_actions = key_actions_save;
       run_mode = MODE_RUNNING;
     }
+
+    // Restore computer sending data.
+    if (flow_in_on) {
+      if (swflow == SWFLOW_XON_XOFF) {
+        if (Serial_write (flow_on) == 1) {
+          Serial_send_now ();
+        }
+      }
+      if ((serial == SERIAL_RS232) && (hwflow == HWFLOW_RTR_CTS)) {
+        digitalWriteFast (serial_rts_pin, LOW);
+      }
+    }
   }
 
   // Handle future setup mode.
   if (run_mode == MODE_FUTURE_BEING_SETUP) {
 
-    if (shift) {  // Reset all settings to factory defaults.
+    // Stop computer sending data.
+    if (flow_in_on) {
+      if (swflow == SWFLOW_XON_XOFF) {
+        if (Serial_write (flow_off) == 1) {
+          Serial_send_now ();
+        }
+      }
+      if ((serial == SERIAL_RS232) && (hwflow == HWFLOW_RTR_CTS)) {
+        digitalWriteFast (serial_rts_pin, HIGH);
+      }
+    }
+
+    // Reset all settings to factory defaults.
+    if (shift) {
       run_mode = MODE_INITIALIZING;
       Initialize_global_variables ();
       Initialize_configuration_settings (TRUE);
@@ -6964,9 +7433,22 @@ void loop () {
       Print_characters ("---- All settings reset to factory defaults.\r\r");
       Wait_print_buffer_empty ();
 
-    } else {  // Interactive setup.
+    // Interactive setup.
+    } else {
       key_actions = key_actions_save;
       run_mode = MODE_RUNNING;
+    }
+
+    // Restore computer sending data.
+    if (flow_in_on) {
+      if (swflow == SWFLOW_XON_XOFF) {
+        if (Serial_write (flow_on) == 1) {
+          Serial_send_now ();
+        }
+      }
+      if ((serial == SERIAL_RS232) && (hwflow == HWFLOW_RTR_CTS)) {
+        digitalWriteFast (serial_rts_pin, LOW);
+      }
     }
   }
 }
@@ -7500,6 +7982,7 @@ inline void ISR_column_14 () {
 
 // Initialize global variables.
 void Initialize_global_variables () {
+
   shift = FALSE;
   shift_lock = FALSE;
   code = FALSE;
@@ -7545,8 +8028,8 @@ void Initialize_global_variables () {
   pb_write = 0;
   pb_count = 0;
 
-  flow_in_on = FALSE;
-  flow_out_on = FALSE;
+  flow_in_on = TRUE;
+  flow_out_on = TRUE;
 
   memset ((void *)error_counts, 0, sizeof(error_counts));
   memset ((void *)warning_counts, 0, sizeof(warning_counts));
@@ -7585,9 +8068,15 @@ void Initialize_configuration_settings (boolean reset) {
   autoreturn = INITIAL_AUTORETURN;
   transmiteol = INITIAL_TRANSMITEOL;
   receiveeol = INITIAL_RECEIVEEOL;
-  ignoreescape = INITIAL_IGNOREESCAPE;
-  width = INITIAL_WIDTH;
-  offset = INITIAL_OFFSET;
+  escapesequence = INITIAL_ESCAPESEQUENCE;
+  length = INITIAL_LENGTH;
+  if (emulation == EMULATION_IBM) {
+    offset = INITIAL_IBM_OFFSET;
+  } else if (emulation == EMULATION_ASCII) {
+    offset = INITIAL_ASCII_OFFSET;
+  } else /* emulation == EMULATION_FUTURE */ {
+    offset = INITIAL_FUTURE_OFFSET;
+  } 
 
   if (reset || (EEPROM.read (EEPROM_FINGERPRINT) != FINGERPRINT)) {
 
@@ -7616,16 +8105,35 @@ void Initialize_configuration_settings (boolean reset) {
     Write_EEPROM (EEPROM_AUTORETURN, autoreturn);
     Write_EEPROM (EEPROM_TRANSMITEOL, transmiteol);
     Write_EEPROM (EEPROM_RECEIVEEOL, receiveeol);
-    Write_EEPROM (EEPROM_IGNOREESCAPE, ignoreescape);
-    Write_EEPROM (EEPROM_WIDTH, width);
+    Write_EEPROM (EEPROM_ESCAPESEQUENCE, escapesequence);
+    Write_EEPROM (EEPROM_LENGTH, length);
     Write_EEPROM (EEPROM_OFFSET, offset);
 
     Set_margins_tabs (TRUE);
 
   } else {
 
+    // Special handling for redefined escape sequence and line offset settings.
+    // Map old setting value     -> new setting value.
+    //     ignoreescape == true  -> escapesequence == ignore.
+    //     ignoreescape == false -> escapesequence == none.
+    //     offset == true        -> offset = 1.
+    //     offset == false       -> offset = 0.
+    if (Read_EEPROM (EEPROM_VERSION, VERSION) < VERSION_ESCAPEOFFSET_CHANGED) {
+      if (Read_EEPROM (EEPROM_ESCAPESEQUENCE, SETTING_TRUE) == SETTING_TRUE) {
+        Write_EEPROM (EEPROM_ESCAPESEQUENCE, ESCAPE_IGNORE);
+      } else /* Read_EEPROM (EEPROM_ESCAPESEQUENCE, SETTING_TRUE) == SETTING_FALSE */ {
+        Write_EEPROM (EEPROM_ESCAPESEQUENCE, ESCAPE_NONE);
+      }
+      if (Read_EEPROM (EEPROM_OFFSET, SETTING_TRUE) == SETTING_TRUE) {
+        Write_EEPROM (EEPROM_OFFSET, 1);
+      } else /* Read_EEPROM (EEPROM_OFFSET, SETTING_TRUE) == SETTING_FALSE */ {
+        Write_EEPROM (EEPROM_OFFSET, 0);
+      }
+    }
+
     // Retrieve configuration parameters and set margins & tabs if needed.
-    if (Read_EEPROM (EEPROM_VERSION, VERSION) != VERSION) Write_EEPROM (EEPROM_VERSION, VERSION);
+    if (Read_EEPROM (EEPROM_VERSION, 0) != VERSION) Write_EEPROM (EEPROM_VERSION, VERSION);
     errors = Read_EEPROM (EEPROM_ERRORS, errors);
     warnings = Read_EEPROM (EEPROM_WARNINGS, warnings);
     battery = Read_EEPROM (EEPROM_BATTERY, battery);
@@ -7646,12 +8154,12 @@ void Initialize_configuration_settings (boolean reset) {
     autoreturn = Read_EEPROM (EEPROM_AUTORETURN, autoreturn);
     transmiteol = Read_EEPROM (EEPROM_TRANSMITEOL, transmiteol);
     receiveeol = Read_EEPROM (EEPROM_RECEIVEEOL, receiveeol);
-    ignoreescape = Read_EEPROM (EEPROM_IGNOREESCAPE, ignoreescape);
-    width = Read_EEPROM (EEPROM_WIDTH, width);
+    escapesequence = Read_EEPROM (EEPROM_ESCAPESEQUENCE, escapesequence);
+    length = Read_EEPROM (EEPROM_LENGTH, length);
     offset = Read_EEPROM (EEPROM_OFFSET, offset);
 
     if (emulation == pemulation) {
-      for (int i = 0; i < 166; ++i) {
+      for (int i = 0; i < 200; ++i) {
         tabs[i] = Read_EEPROM (EEPROM_TABS + i, tabs[i]);
       }
       if (battery == SETTING_FALSE) {
@@ -7665,6 +8173,7 @@ void Initialize_configuration_settings (boolean reset) {
 
 // Clear all row drive lines.
 inline void Clear_all_row_lines () {
+
   digitalWriteFast (ROW_ENABLE_PIN, HIGH);
   digitalWriteFast (ROW_OUT_1_PIN, LOW);
   digitalWriteFast (ROW_OUT_2_PIN, LOW);
@@ -7678,6 +8187,7 @@ inline void Clear_all_row_lines () {
 
 // Detect and process a key press.
 inline void Process_key (int pin, int key) {
+
   if (digitalReadFast (pin) == LOW) {  // Key pressed?
     if (!key_pressed_states[key]) {  // First time seen?
       key_pressed_states[key] = TRUE;
@@ -7692,6 +8202,7 @@ inline void Process_key (int pin, int key) {
 
 // Detect and process a repeating key press.
 inline void Process_repeating_key (int pin, int key) {
+
   if (digitalReadFast (pin) == LOW) {  // Key pressed?
     if (!key_pressed_states[key]) {  // First time seen?
       key_pressed_states[key] = TRUE;
@@ -7711,6 +8222,7 @@ inline void Process_repeating_key (int pin, int key) {
 
 // Detect and process a return key press.
 inline void Process_return_key (int pin, int key) {
+
   if (digitalReadFast (pin) == LOW) {  // Key pressed?
     if (!key_pressed_states[key]) {  // First time seen?
       key_pressed_states[key] = TRUE;
@@ -7734,6 +8246,7 @@ inline void Process_return_key (int pin, int key) {
 
 // Detect and process a shift key press.
 inline void Process_shift_key (int pin, int key) {
+
   if (digitalReadFast (pin) == LOW) {  // Key pressed?
     if (!key_pressed_states[key]) {  // First time seen?
       key_pressed_states[key] = TRUE;
@@ -7752,6 +8265,7 @@ inline void Process_shift_key (int pin, int key) {
 
 // Detect and process a shift lock key press.
 inline void Process_shift_lock_key (int pin, int key) {
+
   if (digitalReadFast (pin) == LOW) {  // Key pressed?
     if (!key_pressed_states[key]) {  // First time seen?
       key_pressed_states[key] = TRUE;
@@ -7774,6 +8288,7 @@ inline void Process_shift_lock_key (int pin, int key) {
 
 // Detect and process a code key press.
 inline void Process_code_key (int pin, int key) {
+
   if (digitalReadFast (pin) == LOW) {  // Key pressed?
     if (!key_pressed_states[key]) {  // First time seen?
       key_pressed_states[key] = TRUE;
@@ -7791,6 +8306,7 @@ inline void Process_code_key (int pin, int key) {
 
 // Send a single character.
 inline boolean Send_character (char chr) {
+
   if (sb_count < SIZE_SEND_BUFFER) {
     send_buffer[sb_write] = chr;
     if (++sb_write >= SIZE_SEND_BUFFER) sb_write = 0;
@@ -7805,6 +8321,7 @@ inline boolean Send_character (char chr) {
 // Send a string of characters.
 inline boolean Send_characters (const char str[]) {
   const char *ptr = str;
+
   while (*ptr != 0) {
     if (!Send_character (*(ptr++))) return FALSE;  // Character doesn't fit in send buffer.
   }
@@ -7813,6 +8330,7 @@ inline boolean Send_characters (const char str[]) {
 
 // Transfer a print string to main for processing.
 inline boolean Transfer_print_string (const struct print_info *str) {
+
   if (tb_count < SIZE_TRANSFER_BUFFER) {
     transfer_buffer[tb_write] = str;
     if (++tb_write >= SIZE_TRANSFER_BUFFER) tb_write = 0;
@@ -7825,9 +8343,33 @@ inline boolean Transfer_print_string (const struct print_info *str) {
 }
 
 // Read an integer.
-int Read_integer (int def) {
-  // TBD - implement functionality.
-  return def;
+int Read_integer (int value) {
+  char chr;
+  boolean neg = FALSE;
+  int tmp = 0;
+  int otmp = 0;
+
+  chr = Read_setup_character_from_set ("-0123456789\r");
+  if (chr == '\r') {
+    Print_integer (value, 0);
+    return value;
+  } else if (chr == '-') {
+    Print_character (chr);
+    neg = TRUE;
+  } else /* chr == <digit> */ {
+    Print_character (chr);
+    tmp = chr - '0';
+  }
+  
+  while (tmp >= otmp) {
+    chr = Read_setup_character_from_set ("0123456789\r");
+    if (chr == '\r') return (neg ? - tmp : tmp);
+    Print_character (chr);
+    otmp = tmp;
+    tmp = 10 * tmp + (chr - '0');
+  }
+
+  return (neg ? INT_MIN : INT_MAX);
 }
 
 // Print an integer.
@@ -7835,31 +8377,17 @@ boolean Print_integer (int val, int wid) {
   int tmp = abs (val);
   int idx = 11;
   char chr[12];
+
   memset ((void *)chr, ' ', sizeof(chr));
   chr[idx--] = 0x00;
+
   do {
     chr[idx--] = '0' + (tmp % 10);
     tmp /= 10;
   } while (tmp > 0);
-  if (val < 0) chr[idx--] = '-';
-  if (wid > 0) {
-    return Print_characters (&chr[11 - wid]);
-  } else {
-    return Print_characters (&chr[idx + 1]);
-  }
-}
 
-// Print an unsigned long.
-boolean Print_unsigned_long (unsigned long val, int wid) {
-  unsigned long tmp = val;
-  int idx = 11;
-  char chr[12];
-  memset ((void *)chr, ' ', sizeof(chr));
-  chr[idx--] = 0x00;
-  do {
-    chr[idx--] = '0' + (tmp % 10);
-    tmp /= 10;
-  } while (tmp > 0UL);
+  if (val < 0) chr[idx--] = '-';
+
   if (wid > 0) {
     return Print_characters (&chr[11 - wid]);
   } else {
@@ -7870,6 +8398,7 @@ boolean Print_unsigned_long (unsigned long val, int wid) {
 // Print a single character.
 inline boolean Print_character (char chr) {
   struct serial_action act = ASCII_SERIAL_ACTIONS[chr & 0x7f];
+
   if (act.print != NULL) {
     if (!Print_string (act.print)) return FALSE;  // Character doesn't fit in print buffer.
   }
@@ -7879,6 +8408,7 @@ inline boolean Print_character (char chr) {
 // Print a string of characters.
 inline boolean Print_characters (const char str[]) {
   const char *ptr = str;
+
   while (*ptr != 0) {
     struct serial_action act = ASCII_SERIAL_ACTIONS[*(ptr++) & 0x7f];
     if (act.print != NULL) {
@@ -7901,7 +8431,7 @@ boolean Print_string (const struct print_info *str) {
   // or beep.  If the line overflows and automatic return is disabled, then trigger a warning, beep, and ignore the
   // character.
   if ((current_column > rmargin) &&
-      (str->string != (const byte (*)[1000])(&WW_STR_CRtn_IndClr)) &&
+      (str->string != (const byte (*)[1000])(&WW_STR_CRtn)) &&
       (str->string != (const byte (*)[1000])(&WW_STR_LARROW)) &&
       (str->string != (const byte (*)[1000])(&WW_STR_RARROW)) &&
       (str->string != (const byte (*)[1000])(&WW_STR_Backspace)) &&
@@ -7966,7 +8496,7 @@ boolean Print_string (const struct print_info *str) {
   if (str->timing >= 0) {
     residual_time += str->timing;
   } else {  // Prorate return time based on current column position.
-    residual_time = TIME_HMOVEMENT + (current_column * (- str->timing) / width);
+    residual_time = TIME_HMOVEMENT + (current_column * (- str->timing) / length);
   }
 
   // Add empty full scans as needed.
@@ -8037,7 +8567,7 @@ boolean Print_string (const struct print_info *str) {
     case SPACING_CLRALL:   // No horizontal movement, clear all tabs.
       memset ((void *)tabs, SETTING_FALSE, sizeof(tabs));
       tabs[rmargin] = SETTING_TRUE;
-      for (int i = 0; i < 166; ++i) {
+      for (int i = 0; i < 200; ++i) {
         Write_EEPROM (EEPROM_TABS + i, SETTING_FALSE);
       }
       break;
@@ -8050,12 +8580,14 @@ boolean Print_string (const struct print_info *str) {
 
 // Test if printing has caught up.
 inline boolean Test_printing_caught_up () {
+
   return ((interrupt_column == WW_COLUMN_1) &&
           (last_scan_duration < LONG_SCAN_DURATION) && (last_last_scan_duration < LONG_SCAN_DURATION));
 }
 
 // Wait for the print buffer to be empty.
 inline void Wait_print_buffer_empty () {
+
     while (pb_count > 0) delay (1);
     delay (2 * LONG_SCAN_DURATION);
 }
@@ -8259,6 +8791,7 @@ __attribute__((noinline)) void Update_counter (volatile int *counter, int increm
 
 // Read an EEPROM entry and update if undefined.
 inline byte Read_EEPROM (int location, byte value) {
+
   byte temp = EEPROM.read (location);
   if (temp == 0) {
     EEPROM.write (location, value);
@@ -8270,11 +8803,13 @@ inline byte Read_EEPROM (int location, byte value) {
 
 // Write an EEPROM entry.
 inline void Write_EEPROM (int location, byte value) {
+
   EEPROM.write (location, value);
 }
 
 // Report an error.
 void Report_error (int error) {
+
   if ((run_mode == MODE_RUNNING) && (errors == SETTING_TRUE) &&
       (error > ERROR_NULL) && (error < NUM_ERRORS)) {
     ++total_errors;
@@ -8285,6 +8820,7 @@ void Report_error (int error) {
 
 // Report a warning.
 void Report_warning (int warning) {
+
   if ((run_mode == MODE_RUNNING) && (warnings == SETTING_TRUE) &&
       (warning > WARNING_NULL) && (warning < NUM_WARNINGS)) {
     ++total_warnings;
@@ -8300,12 +8836,12 @@ void Set_margins_tabs (boolean reset) {
   if (reset) {
     memset ((void *)tabs, SETTING_FALSE, sizeof(tabs));
     if (emulation == EMULATION_ASCII) {
-      for (int i = 8; i < 166; i += 8) {
+      for (int i = 8; i < 200; i += 8) {
         tabs[i] = SETTING_TRUE;
       }
     }
     tabs[rmargin] = SETTING_TRUE;
-    for (int i = 0; i < 166; ++i) {
+    for (int i = 0; i < 200; ++i) {
       Write_EEPROM (EEPROM_TABS + i, tabs[i]);
     }
   }
@@ -8313,10 +8849,12 @@ void Set_margins_tabs (boolean reset) {
   // Set left margin.
   Print_string (&WW_PRINT_CRtn);
   Print_string (&WW_PRINT_MarRel);
-  for (int i = 0; i < 10; ++i) {
+  for (int i = 0; i < 20; ++i) {
     Print_string (&WW_PRINT_Backspace);
   }
-  if ((emulation == EMULATION_ASCII) && (offset == SETTING_TRUE)) Print_string (&WW_PRINT_SPACE);
+  for (int i = 0; i < offset; ++i) {
+    Print_string (&WW_PRINT_SPACE);
+  }
   current_column = 1;
   for (int i = 1; i < lmargin; ++i) {
     Print_string (&WW_PRINT_SPACE);
@@ -8355,7 +8893,7 @@ char Read_setup_command () {
   } else if ((cmd == 'c') || (cmd == 'C')) {
     Print_characters ("character set\r");
     return 'c';
-  } else if (cmd == '\004') {
+  } else if (cmd == '\004') {  // Control-D
     Print_characters ("developer\r");
     return 'd';
   } else /* (cmd == 'q') || (cmd == 'Q') || (cmd == '\r') */ {
@@ -8369,8 +8907,7 @@ boolean Ask_yesno_question (const char str[], boolean value) {
   boolean val;
 
   // Print prompt.
-  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
-  Print_characters (str);
+  Print_characters ("  "); Print_characters (str);
   if (value) {
     Print_characters (" [YES/no]? ");
   } else /* !value */ {
@@ -8379,7 +8916,7 @@ boolean Ask_yesno_question (const char str[], boolean value) {
   Space_to_column (COLUMN_QUESTION);
 
   // Read response.
-  byte chr = Read_setup_character_from_set ("yYnN\r");
+  char chr = Read_setup_character_from_set ("yYnN\r");
   if ((chr == 'y') || (chr == 'Y')) {
     val = TRUE;
   } else if ((chr == 'n') || (chr == 'N')) {
@@ -8403,8 +8940,7 @@ byte Read_truefalse_setting (const char str[], byte value) {
   byte val;
 
   // Print prompt.
-  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
-  Print_characters (str);
+  Print_characters ("  "); Print_characters (str);
   if (value == SETTING_TRUE) {
     Print_characters (" [TRUE/false]: ");
   } else /* value == SETTING_FALSE */ {
@@ -8413,7 +8949,7 @@ byte Read_truefalse_setting (const char str[], byte value) {
   Space_to_column (COLUMN_RESPONSE);
 
   // Read response.
-  byte chr = Read_setup_character_from_set ("tTfF\r");
+  char chr = Read_setup_character_from_set ("tTfF\r");
   if ((chr == 't') || (chr == 'T')) {
     val = SETTING_TRUE;
   } else if ((chr == 'f') || (chr == 'F')) {
@@ -8437,8 +8973,7 @@ byte Read_serial_setting (const char str[], byte value) {
   byte val;
 
   // Print prompt.
-  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
-  Print_characters (str);
+  Print_characters ("  "); Print_characters (str);
   if (value == SERIAL_USB) {
     Print_characters (" [USB/rs232]: ");
   } else /* value == SERIAL_RS232 */ {
@@ -8447,7 +8982,7 @@ byte Read_serial_setting (const char str[], byte value) {
   Space_to_column (COLUMN_RESPONSE);
 
   // Read response.
-  byte chr = Read_setup_character_from_set ("uUrR\r");
+  char chr = Read_setup_character_from_set ("uUrR\r");
   if ((chr == 'u') || (chr == 'U')) {
     val = SERIAL_USB;
   } else if ((chr == 'r') || (chr == 'R')) {
@@ -8471,8 +9006,7 @@ byte Read_duplex_setting (const char str[], byte value) {
   byte val;
 
   // Print prompt.
-  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
-  Print_characters (str);
+  Print_characters ("  "); Print_characters (str);
   if (value == DUPLEX_HALF) {
     Print_characters (" [HALF/full]: ");
   } else /* value == DUPLEX_FULL */ {
@@ -8481,7 +9015,7 @@ byte Read_duplex_setting (const char str[], byte value) {
   Space_to_column (COLUMN_RESPONSE);
 
   // Read response.
-  byte chr = Read_setup_character_from_set ("hHfF\r");
+  char chr = Read_setup_character_from_set ("hHfF\r");
   if ((chr == 'h') || (chr == 'H')) {
     val = DUPLEX_HALF;
   } else if ((chr == 'f') || (chr == 'F')) {
@@ -8504,13 +9038,12 @@ byte Read_duplex_setting (const char str[], byte value) {
 byte Read_baud_setting (const char str[], byte value) {
 
   // Print prompt.
-  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
-  Print_characters (str);
-  Print_characters (" [50-230400, ");  Print_unsigned_long (baud_rates[value], 0);  Print_characters ("]: ");
+  Print_characters ("  "); Print_characters (str);
+  Print_characters (" [50-230400, ");  Print_integer (baud_rates[value], 0);  Print_characters ("]: ");
   Space_to_column (COLUMN_RESPONSE);
 
   // Read and print response.
-  byte chr = Read_setup_character_from_set ("12345679\r");
+  char chr = Read_setup_character_from_set ("12345679\r");
 
   if (chr == '1') {
     Print_character ('1');
@@ -8602,7 +9135,7 @@ byte Read_baud_setting (const char str[], byte value) {
     return BAUD_9600;
 
   } else /* chr == '\r' */ {
-    Print_unsigned_long (baud_rates[value], 0);
+    Print_integer (baud_rates[value], 0);
     Print_character ('\r');
     return value;
   }
@@ -8613,8 +9146,7 @@ byte Read_parity_setting (const char str[], byte value) {
   byte val;
 
   // Print prompt.
-  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
-  Print_characters (str);
+  Print_characters ("  "); Print_characters (str);
   if (value == PARITY_NONE) {
     Print_characters (" [NONE/odd/even]: ");
   } else if (value == PARITY_ODD) {
@@ -8625,7 +9157,7 @@ byte Read_parity_setting (const char str[], byte value) {
   Space_to_column (COLUMN_RESPONSE);
 
   // Read response.
-  byte chr = Read_setup_character_from_set ("nNoOeE\r");
+  char chr = Read_setup_character_from_set ("nNoOeE\r");
   if ((chr == 'n') || (chr == 'N')) {
     val = PARITY_NONE;
   } else if ((chr == 'o') || (chr == 'O')) {
@@ -8652,8 +9184,7 @@ byte Read_parity_setting (const char str[], byte value) {
 byte Read_dps_setting (const char str[], byte value) {
 
   // Print prompt.
-  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
-  Print_characters (str);
+  Print_characters ("  "); Print_characters (str);
   if (value == DPS_7O1) {
     Print_characters (" [7O1/7e1/8n1/8o1/8e1/8n2/8o2/8e2]: ");
   } else if (value == DPS_7E1) {
@@ -8674,7 +9205,7 @@ byte Read_dps_setting (const char str[], byte value) {
   Space_to_column (COLUMN_RESPONSE);
 
   // Read and print response.
-  byte chr = Read_setup_character_from_set ("78\r");
+  char chr = Read_setup_character_from_set ("78\r");
 
   if (chr == '7') {
     Print_character ('7');
@@ -8736,8 +9267,7 @@ byte Read_swflow_setting (const char str[], byte value) {
   byte val;
 
   // Print prompt.
-  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
-  Print_characters (str);
+  Print_characters ("  "); Print_characters (str);
   if (value == SWFLOW_NONE) {
     Print_characters (" [NONE/xon_xoff]: ");
   } else /* value == SWFLOW_XON_XOFF */ {
@@ -8746,7 +9276,7 @@ byte Read_swflow_setting (const char str[], byte value) {
   Space_to_column (COLUMN_RESPONSE);
 
   // Read response.
-  byte chr = Read_setup_character_from_set ("nNxX\r");
+  char chr = Read_setup_character_from_set ("nNxX\r");
   if ((chr == 'n') || (chr == 'N')) {
     val = SWFLOW_NONE;
   } else if ((chr == 'x') || (chr == 'X')) {
@@ -8769,8 +9299,7 @@ byte Read_swflow_setting (const char str[], byte value) {
 byte Read_hwflow_setting (const char str[], byte value) {
 
   // Print prompt.
-  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
-  Print_characters (str);
+  Print_characters ("  "); Print_characters (str);
   if (value == HWFLOW_NONE) {
     Print_characters (" [NONE/rts_cts/rtr_cts]: ");
   } else if (value == HWFLOW_RTS_CTS) {
@@ -8781,7 +9310,7 @@ byte Read_hwflow_setting (const char str[], byte value) {
   Space_to_column (COLUMN_RESPONSE);
 
   // Read and print response.
-  byte chr = Read_setup_character_from_set ("nNrR\r");
+  char chr = Read_setup_character_from_set ("nNrR\r");
 
   if ((chr == 'n') || (chr == 'N')) {
     Print_characters ("none\r");
@@ -8814,8 +9343,7 @@ byte Read_hwflow_setting (const char str[], byte value) {
 byte Read_eol_setting (const char str[], byte value) {
 
   // Print prompt.
-  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
-  Print_characters (str);
+  Print_characters ("  "); Print_characters (str);
   if (value == EOL_CR) {
     Print_characters (" [CR/crlf/lf/lfcr]: ");
   } else if (value == EOL_CRLF) {
@@ -8828,7 +9356,7 @@ byte Read_eol_setting (const char str[], byte value) {
   Space_to_column (COLUMN_RESPONSE);
 
   // Read and print response.
-  byte chr = Read_setup_character_from_set ("cClL\r");
+  char chr = Read_setup_character_from_set ("cClL\r");
 
   if ((chr == 'c') || (chr == 'C')) {
     Print_characters ("cr");
@@ -8866,53 +9394,63 @@ byte Read_eol_setting (const char str[], byte value) {
   }
 }
 
-// Read a width setting.
-byte Read_width_setting (const char str[], byte value) {
+// Read an escape sequence setting.
+byte Read_escapesequence_setting (const char str[], byte value) {
   byte val;
 
   // Print prompt.
-  Print_string (&WW_PRINT_SPACE);  Print_string (&WW_PRINT_SPACE);
-  Print_characters (str);
-  Print_characters (" [80-165, ");  Print_integer (value, 0);  Print_characters ("]: ");
+  Print_characters ("  "); Print_characters (str);
+  if (value == ESCAPE_NONE) {
+    Print_characters (" [NONE/ignore]: ");
+  } else /* value == ESCAPE_IGNORE */ {
+    Print_characters (" [none/IGNORE]: ");
+  }
   Space_to_column (COLUMN_RESPONSE);
 
-  // Read and print response.
-  byte chr = Read_setup_character_from_set ("891\r");
-
-  if ((chr == '8') || (chr == '9')) {
-    Print_character (chr);
-    val = 10 * (chr - '0');
-    chr = Read_setup_character_from_set ("0123456789");
-    Print_character (chr);
-    Print_character ('\r');
-    val += chr - '0';
-    return val;
-
-  } else if (chr == '1') {
-    Print_character ('1');
-    val = 100;
-    chr = Read_setup_character_from_set ("0123456");
-    Print_character (chr);
-    val += 10 * (chr - '0');
-    if (chr == '6') {
-      chr = Read_setup_character_from_set ("012345");
-    } else {
-      chr = Read_setup_character_from_set ("0123456789");
-    }
-    Print_character (chr);
-    Print_character ('\r');
-    val += chr - '0';
-    return val;
-
+  // Read response.
+  char chr = Read_setup_character_from_set ("nNiI\r");
+  if ((chr == 'n') || (chr == 'N')) {
+    val = ESCAPE_NONE;
+  } else if ((chr == 'i') || (chr == 'I')) {
+    val = ESCAPE_IGNORE;
   } else /* chr == '\r' */ {
-    Print_integer (value, 0);
-    Print_character ('\r');
-    return value;
+    val = value;
+  }
+
+  // Print response.
+  if (val == ESCAPE_NONE) {
+    Print_characters ("none\r");
+  } else /* val == ESCAPE_IGNORE */ {
+    Print_characters ("ignore\r");
+  }
+
+  return val;
+}
+
+// Read an integer setting.
+byte Read_integer_setting (const char str[], byte value, byte min, byte max) {
+
+  while (true) {
+
+    // Print prompt.
+    Print_characters ("  "); Print_characters (str);
+    Print_characters (" ["); Print_integer (min, 0); Print_characters ("-"); Print_integer (max, 0);
+    Print_characters (", "); Print_integer (value, 0); Print_characters ("]: ");
+    Space_to_column (COLUMN_RESPONSE);
+
+    int val = Read_integer (value);
+    if ((val >= min) && (val <= max)) {
+      Print_characters ("\r");
+      return (byte)val;
+    }
+
+    Print_characters ("\a invalid\r");
   }
 }
 
 // Developer functions.
 void Developer_functions () {
+
   run_mode = MODE_RUNNING;
   Print_string (&WW_PRINT_CRtn);
 
@@ -8934,6 +9472,7 @@ void Developer_functions () {
 
 // Measure keyboard bounce.
 void Measure_keyboard_bounce () {
+
   Print_characters ("\r    Not implemented yet.\r\r");
 }
 
@@ -8976,6 +9515,7 @@ void Calibrate_printer_timing () {
 
 // Change typewriter settings.
 void Change_typewriter_settings () {
+
   Print_characters ("\r    Not implemented yet.\r\r");
 }
 
@@ -9136,8 +9676,7 @@ void Print_errors_warnings () {
         Print_string (&WW_PRINT_CRtn);
       }
     }
-    Print_string (&WW_PRINT_CRtn);
-    if (Ask_yesno_question ("Reset errors", FALSE)) {
+    if (Ask_yesno_question ("\rReset errors", FALSE)) {
       total_errors = 0;
       memset ((void *)error_counts, 0, sizeof(error_counts));
       digitalWriteFast (ORANGE_LED_PIN, LOW);
@@ -9157,8 +9696,7 @@ void Print_errors_warnings () {
         Print_string (&WW_PRINT_CRtn);
       }
     }
-    Print_string (&WW_PRINT_CRtn);
-    if (Ask_yesno_question ("Reset warnings", FALSE)) {
+    if (Ask_yesno_question ("\rReset warnings", FALSE)) {
       total_warnings = 0;
       memset ((void *)warning_counts, 0, sizeof(warning_counts));
       digitalWriteFast (BLUE_LED_PIN, blue_led_off);
@@ -9171,6 +9709,7 @@ void Print_errors_warnings () {
 
 // Read a setup character.
 byte Read_setup_character () {
+
   while (cb_count == 0) delay (1);
   byte chr = command_buffer[cb_read];
   if (++cb_read >= SIZE_COMMAND_BUFFER) cb_read = 0;
@@ -9180,6 +9719,7 @@ byte Read_setup_character () {
 
 // Read a setup character from a defined set.
 byte Read_setup_character_from_set (const char *charset) {
+
   while (TRUE) {
     while (cb_count == 0) delay (1);
     byte chr = command_buffer[cb_read];
@@ -9195,7 +9735,8 @@ byte Read_setup_character_from_set (const char *charset) {
 
 // Space to print column.
 void Space_to_column (int col) {
-  if ((col >= 1) && (col <= width)) {
+
+  if ((col >= 1) && (col <= length)) {
     while (current_column < col) {
       Print_string (&WW_PRINT_SPACE);
     }
@@ -9204,23 +9745,52 @@ void Space_to_column (int col) {
 
 // Open serial communications port.
 void Serial_begin () {
+
   if (serial == SERIAL_USB) {
+
     Serial.begin (115200);
-  } else if (serial == SERIAL_RS232) {
+
+  } else /* serial == SERIAL_RS232 */ {
+
     if (baud >= MINIMUM_HARDWARE_BAUD) {
       Serial1.begin (baud_rates[baud], data_parity_stops[dps]);
       Serial1.clear ();  // Workaround to clear FIFO scrambling permitted by driver.
       rs232_mode = RS232_UART;
+      rts_size = Serial1.availableForWrite ();
     } else {  // The baud rate is too slow for UART, switch to SlowSoftSerial.
       slow_serial_port.begin (baud_rates[baud], data_parity_stops_slow[dps]);
       rs232_mode = RS232_SLOW;
+      rts_size = slow_serial_port.availableForWrite ();
     }
+
+    if (hwflow == HWFLOW_NONE) {
+      digitalWriteFast (serial_rts_pin, LOW);
+      rts_state = RTS_ON;
+      return;
+    } else if (hwflow == HWFLOW_RTS_CTS) {
+      digitalWriteFast (serial_rts_pin, HIGH);
+      rts_state = RTS_OFF;
+    } else /* hwflow == HWFLOW_RTR_CTS */ {
+      digitalWriteFast (serial_rts_pin, LOW);
+      rts_state = RTS_ON;
+    }
+
+    if (rs232_mode == RS232_UART) {
+      Serial1.attachCts (serial_cts_pin);
+    } else /* rs232_mode == RS232_SLOW */ {
+      slow_serial_port.attachCts (serial_cts_pin);
+    }
+  }
+
+  if (swflow == SWFLOW_XON_XOFF) {
+    Send_character (CHAR_ASCII_XON);
   }
 }
 
 // Close serial communications port.
 void Serial_end (byte port) {
-    if (port == SERIAL_USB) {
+
+  if (port == SERIAL_USB) {
     Serial.end ();
   } else /* port == SERIAL_RS232 */ {
     if (rs232_mode == RS232_UART) {
@@ -9233,6 +9803,7 @@ void Serial_end (byte port) {
 
 // Test character available on serial communication port.
 inline boolean Serial_available () {
+
   if (serial == SERIAL_USB) {
     return Serial.available ();
   } else /* serial == SERIAL_RS232 */{
@@ -9246,6 +9817,7 @@ inline boolean Serial_available () {
 
 // Read serial communication port.
 inline byte Serial_read () {
+
   if (serial == SERIAL_USB) {
     return Serial.read ();
   } else /* serial == SERIAL_RS232 */ {
@@ -9258,28 +9830,42 @@ inline byte Serial_read () {
 }
 
 // Write serial communication port.
-inline int Serial_write (byte chr) {
-  if (serial == SERIAL_USB) {
-    return Serial.write (chr);
-  } else /* serial == SERIAL_RS232 */ {
-    if (rs232_mode == RS232_UART) {
-      if (Serial1.availableForWrite () >= 1) {
-        return Serial1.write (chr);
-      } else {
-        return 0;
+int Serial_write (byte chr) {
+
+  if (flow_out_on) {
+    if (serial == SERIAL_USB) {
+      return Serial.write (chr);
+    } else /* serial == SERIAL_RS232 */ {
+      if ((hwflow == HWFLOW_RTS_CTS) && (rts_state != RTS_ON)) {
+        digitalWriteFast (serial_rts_pin, LOW);
+        rts_state = RTS_ON;
       }
-    } else /* rs232_mode == RS232_SLOW */ {
-      if (slow_serial_port.availableForWrite () >= 1) {
-        return slow_serial_port.write (chr);
+      if ((hwflow == HWFLOW_NONE) || (digitalReadFast (serial_cts_pin) == LOW)) {
+        if (rs232_mode == RS232_UART) {
+          if (Serial1.availableForWrite () >= 1) {
+            return Serial1.write (chr);
+          } else {
+            return 0;
+          }
+        } else /* rs232_mode == RS232_SLOW */ {
+          if (slow_serial_port.availableForWrite () >= 1) {
+            return slow_serial_port.write (chr);
+          } else {
+            return 0;
+          }
+        }
       } else {
         return 0;
       }
     }
+  } else {
+    return 0;
   }
 }
 
 // Send now to serial communication port.
 inline void Serial_send_now () {
+
   if (serial == SERIAL_USB) {
     Serial.send_now ();
   } else /* serial == SERIAL_RS232 */ {
